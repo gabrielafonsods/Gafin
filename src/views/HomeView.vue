@@ -1,17 +1,22 @@
 <script setup lang="ts">
+import { reactive } from "vue";
 import PlaceholderCard from "@/components/PlaceholderCard.vue";
+import { useInvestments } from "@/composables/useInvestments";
 import { formatCurrency } from "@/utils/currency";
 
-// Valores fixos em zero apenas para dar forma ao layout. Serão substituídos
-// por dados reais quando os repositórios de transações/faturas existirem.
-const summary = {
+const { totalInvested } = useInvestments();
+
+// Os demais valores seguem fixos em zero: serão substituídos por dados
+// reais quando os repositórios de contas/transações/faturas existirem.
+// patrimonioInvestido já reflete o investmentsRepository de verdade.
+const summary = reactive({
   saldoTotal: 0,
   saldoDisponivel: 0,
   entradasMes: 0,
   saidasMes: 0,
   gastosCartao: 0,
-  patrimonioInvestido: 0,
-};
+  patrimonioInvestido: totalInvested,
+});
 </script>
 
 <template>

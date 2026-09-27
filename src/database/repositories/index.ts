@@ -1,11 +1,11 @@
 import { BaseRepository } from "./base-repository";
-import type { Account } from "../schema";
+import type { Account, Investment } from "../schema";
 
 /**
- * Único repositório concreto desta primeira etapa — serve como exemplo do
- * padrão a seguir. Os próximos (cardsRepository, transactionsRepository,
- * categoriesRepository, invoicesRepository, investmentsRepository) devem
- * ser criados aqui do mesmo jeito, cada um em seu próprio arquivo se
- * ganhar métodos específicos de domínio.
+ * Repositórios concretos disponíveis. Os próximos (cardsRepository,
+ * transactionsRepository, categoriesRepository, invoicesRepository) devem
+ * ser adicionados aqui do mesmo jeito, cada um em seu próprio arquivo se
+ * ganhar métodos específicos de domínio além do CRUD básico.
  */
 export const accountsRepository = new BaseRepository<Account>("accounts");
+export const investmentsRepository = new BaseRepository<Investment>("investments");

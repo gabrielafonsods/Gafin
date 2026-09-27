@@ -11,7 +11,7 @@ export const DB_NAME = "gafin-db";
 // Incremente sempre que STORES mudar. O IndexedDB só roda onupgradeneeded
 // quando a versão solicitada é maior que a versão já existente no
 // dispositivo do usuário.
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 export interface StoreDefinition {
   name: string;
@@ -21,11 +21,9 @@ export interface StoreDefinition {
 }
 
 /**
- * Stores previstas para o sistema financeiro completo.
- * Nesta primeira etapa apenas "accounts" é criada como prova de que o
- * pipeline schema -> db -> repository funciona; as demais serão
- * adicionadas (cada uma com sua migração) conforme as funcionalidades
- * forem implementadas.
+ * Stores previstas para o sistema financeiro completo. Cada nova store
+ * adicionada aqui é criada automaticamente no próximo boot do app (ver
+ * db.ts) sem apagar os dados já existentes dos usuários.
  */
 export const STORES: Record<string, StoreDefinition> = {
   accounts: {
@@ -33,6 +31,12 @@ export const STORES: Record<string, StoreDefinition> = {
     keyPath: "id",
     autoIncrement: true,
     indexes: [{ name: "by_name", keyPath: "name" }],
+  },
+  investments: {
+    name: "investments",
+    keyPath: "id",
+    autoIncrement: true,
+    indexes: [{ name: "by_asset_name", keyPath: "assetName" }],
   },
 };
 
@@ -77,4 +81,5 @@ export interface Investment {
   assetName: string;
   quantity: number;
   averagePrice: number;
+  createdAt: string;
 }
