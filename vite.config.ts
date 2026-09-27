@@ -5,7 +5,7 @@ import { VitePWA } from "vite-plugin-pwa";
 // IMPORTANTE: troque "gafin" pelo nome real do seu repositório no GitHub,
 // caso seja diferente. Em dev o base continua "/" para não atrapalhar o
 // servidor local.
-const REPO_NAME = "gafin";
+const REPO_NAME = "Gafin";
 
 export default defineConfig(({ mode }) => ({
   base: mode === "production" ? `/${REPO_NAME}/` : "/",
