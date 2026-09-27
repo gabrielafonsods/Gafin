@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       includeAssets: ["icons/icon-192.png", "icons/icon-512.png"],
       manifest: {
-        id: "/gafin/",
+        id: `/${REPO_NAME}/`,
         name: "Gafin",
         short_name: "Gafin",
         description: "Seu dinheiro, sob controle.",
