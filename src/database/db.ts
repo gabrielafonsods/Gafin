@@ -1,4 +1,5 @@
 import { DB_NAME, DB_VERSION, STORES } from "./schema";
+import { SEEDS } from "./seeds";
 
 let dbInstance: IDBDatabase | null = null;
 let openPromise: Promise<IDBDatabase> | null = null;
@@ -27,6 +28,9 @@ export function initDatabase(): Promise<IDBDatabase> {
           objectStore.createIndex(index.name, index.keyPath, {
             unique: index.unique ?? false,
           });
+        }
+        for (const record of SEEDS[store.name] ?? []) {
+          objectStore.add(record);
         }
       }
     };

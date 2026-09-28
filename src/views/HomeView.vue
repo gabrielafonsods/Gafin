@@ -1,22 +1,23 @@
 <script setup lang="ts">
-import { reactive } from "vue";
+import { computed } from "vue";
 import PlaceholderCard from "@/components/PlaceholderCard.vue";
+import { useBalance } from "@/composables/useBalance";
 import { useInvestments } from "@/composables/useInvestments";
 import { formatCurrency } from "@/utils/currency";
 
+const { summary: balanceSummary } = useBalance();
 const { totalInvested } = useInvestments();
 
-// Os demais valores seguem fixos em zero: serão substituídos por dados
-// reais quando os repositórios de contas/transações/faturas existirem.
-// patrimonioInvestido já reflete o investmentsRepository de verdade.
-const summary = reactive({
-  saldoTotal: 0,
-  saldoDisponivel: 0,
-  entradasMes: 0,
-  saidasMes: 0,
-  gastosCartao: 0,
-  patrimonioInvestido: totalInvested,
-});
+// Tudo aqui vem do banco local: saldos e movimentações do mês (useBalance)
+// e patrimônio investido (useInvestments).
+const summary = computed(() => ({
+  saldoTotal: balanceSummary.value.saldoTotal,
+  saldoDisponivel: balanceSummary.value.saldoDisponivel,
+  entradasMes: balanceSummary.value.entradasMes,
+  saidasMes: balanceSummary.value.saidasMes,
+  gastosCartao: balanceSummary.value.gastosCartaoMes,
+  patrimonioInvestido: totalInvested.value,
+}));
 </script>
 
 <template>
