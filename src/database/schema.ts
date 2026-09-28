@@ -12,8 +12,9 @@ export const DB_NAME = "gafin-db";
 // quando a versão solicitada é maior que a versão já existente no
 // dispositivo do usuário.
 // v1: accounts | v2: + investments | v3: + cards, categories, transactions,
-// invoices, transfers
-export const DB_VERSION = 3;
+// invoices, transfers | v4: investments passa a ser a store de ativos
+// (migrada) + investmentOperations e investmentIncomes
+export const DB_VERSION = 4;
 
 export interface StoreDefinition {
   name: string;
@@ -34,11 +35,31 @@ export const STORES: Record<string, StoreDefinition> = {
     autoIncrement: true,
     indexes: [{ name: "by_name", keyPath: "name" }],
   },
+  // Ativos de investimento (nome histórico da store preservado para não
+  // perder os dados já gravados; ver migrations.ts).
   investments: {
     name: "investments",
     keyPath: "id",
     autoIncrement: true,
-    indexes: [{ name: "by_asset_name", keyPath: "assetName" }],
+    indexes: [{ name: "by_name", keyPath: "name" }],
+  },
+  investmentOperations: {
+    name: "investmentOperations",
+    keyPath: "id",
+    autoIncrement: true,
+    indexes: [
+      { name: "by_asset", keyPath: "assetId" },
+      { name: "by_date", keyPath: "date" },
+    ],
+  },
+  investmentIncomes: {
+    name: "investmentIncomes",
+    keyPath: "id",
+    autoIncrement: true,
+    indexes: [
+      { name: "by_asset", keyPath: "assetId" },
+      { name: "by_date", keyPath: "date" },
+    ],
   },
   cards: {
     name: "cards",
@@ -191,10 +212,56 @@ export interface Transfer {
   createdAt: string;
 }
 
-export interface Investment {
+export type AssetType =
+  | "renda_fixa"
+  | "acoes"
+  | "fiis"
+  | "etfs"
+  | "criptomoedas"
+  | "exterior"
+  | "outros";
+
+/**
+ * Ativo. Quantidade, preço médio e valor investido NÃO são gravados: são
+ * derivados das operações (ver portfolioCalculator.ts). Só o preço atual é
+ * informado à mão, por unidade.
+ */
+export interface Asset {
   id?: number;
-  assetName: string;
+  name: string;
+  ticker: string;
+  type: AssetType;
+  institution: string;
+  /** Cotação atual por unidade, informada manualmente. */
+  currentPrice?: number;
+  createdAt: string;
+}
+
+export type OperationType = "compra" | "venda";
+
+export interface InvestmentOperation {
+  id?: number;
+  assetId: number;
+  type: OperationType;
   quantity: number;
-  averagePrice: number;
+  /** Preço por unidade. */
+  price: number;
+  /** Taxas/corretagem da operação (somam ao custo na compra, abatem na venda). */
+  fees: number;
+  date: string;
+  note?: string;
+  createdAt: string;
+}
+
+export type IncomeType = "dividendo" | "jcp" | "rendimento" | "outros";
+
+/** Provento recebido: fica separado das compras/aportes e da posição. */
+export interface InvestmentIncome {
+  id?: number;
+  assetId: number;
+  type: IncomeType;
+  amount: number;
+  date: string;
+  description: string;
   createdAt: string;
 }

@@ -1,4 +1,5 @@
 import { DB_NAME, DB_VERSION, STORES } from "./schema";
+import { runMigrations } from "./migrations";
 import { SEEDS } from "./seeds";
 
 let dbInstance: IDBDatabase | null = null;
@@ -16,7 +17,7 @@ export function initDatabase(): Promise<IDBDatabase> {
   openPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
       const db = request.result;
       for (const store of Object.values(STORES)) {
         if (db.objectStoreNames.contains(store.name)) continue;
@@ -32,6 +33,11 @@ export function initDatabase(): Promise<IDBDatabase> {
         for (const record of SEEDS[store.name] ?? []) {
           objectStore.add(record);
         }
+      }
+      // Transformações de dados de stores que já existiam (rodam depois de
+      // todas as stores novas terem sido criadas).
+      if (request.transaction) {
+        runMigrations(db, request.transaction, event.oldVersion);
       }
     };
 

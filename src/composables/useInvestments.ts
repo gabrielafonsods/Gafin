@@ -1,59 +1,124 @@
-import { ref, computed } from "vue";
-import { investmentsRepository } from "@/database/repositories";
-import type { Investment } from "@/database/schema";
+import { computed, ref } from "vue";
+import {
+  assetsRepository,
+  investmentIncomesRepository,
+  investmentOperationsRepository,
+} from "@/database/repositories";
+import type { Asset, InvestmentIncome, InvestmentOperation } from "@/database/schema";
+import {
+  createAsset,
+  deleteAsset,
+  setCurrentPrice,
+  setCurrentValue,
+  updateAsset,
+  type AssetInput,
+} from "@/services/assetsService";
+import {
+  createAssetIncome,
+  deleteAssetIncome,
+  updateAssetIncome,
+  type AssetIncomeInput,
+} from "@/services/assetIncomesService";
+import {
+  createOperation,
+  deleteOperation,
+  updateOperation,
+  type OperationInput,
+} from "@/services/assetOperationsService";
+import {
+  allocationByAsset,
+  allocationByType,
+  buildAssetViews,
+  summarizePortfolio,
+} from "@/services/portfolioCalculator";
 
 /*
- * Estado em nível de módulo (não dentro da função) de propósito: assim,
- * Ativos e Carteira compartilham a mesma lista reativa sem precisar de
- * Pinia — qualquer alteração feita em uma tela aparece imediatamente na
- * outra. Se o app crescer e precisar de mais stores assim, aí sim vale
- * migrar para Pinia.
+ * Estado compartilhado do módulo Investimentos (refs em nível de módulo, sem
+ * Pinia). Toda escrita passa pelos services (que validam e persistem) e
+ * depois recarrega o estado, então Dashboard, Carteira e Ativos sempre
+ * refletem o que está gravado. Quantidade, preço médio e valor investido são
+ * DERIVADOS das operações (portfolioCalculator).
  */
-const investments = ref<Investment[]>([]);
+const assets = ref<Asset[]>([]);
+const operations = ref<InvestmentOperation[]>([]);
+const incomes = ref<InvestmentIncome[]>([]);
 const loaded = ref(false);
 const loading = ref(false);
 
-async function load(): Promise<void> {
+async function loadAll(): Promise<void> {
   loading.value = true;
   try {
-    investments.value = await investmentsRepository.getAll();
+    const [a, o, i] = await Promise.all([
+      assetsRepository.getAll(),
+      investmentOperationsRepository.getAll(),
+      investmentIncomesRepository.getAll(),
+    ]);
+    assets.value = a;
+    operations.value = o;
+    incomes.value = i;
     loaded.value = true;
   } finally {
     loading.value = false;
   }
 }
 
-async function addInvestment(data: Omit<Investment, "id">): Promise<void> {
-  await investmentsRepository.create(data as Investment);
-  await load();
+async function mutate<T>(operation: () => Promise<T>): Promise<T> {
+  const result = await operation();
+  await loadAll();
+  return result;
 }
 
-async function updateInvestment(data: Investment): Promise<void> {
-  await investmentsRepository.update(data);
-  await load();
+const assetViews = computed(() => buildAssetViews(assets.value, operations.value, incomes.value));
+const summary = computed(() => summarizePortfolio(assetViews.value));
+const typeAllocation = computed(() => allocationByType(assetViews.value));
+const assetAllocation = computed(() => allocationByAsset(assetViews.value));
+
+/** Patrimônio investido (custo das posições em aberto) — usado pelo Início. */
+const totalInvested = computed(() => summary.value.patrimonioInvestido);
+
+/** Mais recentes primeiro. */
+function operationsOf(assetId: number): InvestmentOperation[] {
+  return operations.value
+    .filter((operation) => operation.assetId === assetId)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
 }
 
-async function removeInvestment(id: number): Promise<void> {
-  await investmentsRepository.remove(id);
-  await load();
+function incomesOf(assetId: number): InvestmentIncome[] {
+  return incomes.value
+    .filter((income) => income.assetId === assetId)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
 }
-
-const totalInvested = computed(() =>
-  investments.value.reduce((sum, item) => sum + item.quantity * item.averagePrice, 0),
-);
 
 export function useInvestments() {
   if (!loaded.value && !loading.value) {
-    void load();
+    void loadAll();
   }
 
   return {
-    investments,
+    // dados e derivados
+    assets,
     loaded,
+    assetViews,
+    summary,
+    typeAllocation,
+    assetAllocation,
     totalInvested,
-    addInvestment,
-    updateInvestment,
-    removeInvestment,
-    reload: load,
+    operationsOf,
+    incomesOf,
+    // ativos
+    addAsset: (input: AssetInput) => mutate(() => createAsset(input)),
+    editAsset: (id: number, input: AssetInput) => mutate(() => updateAsset(id, input)),
+    removeAsset: (id: number) => mutate(() => deleteAsset(id)),
+    updateCurrentPrice: (id: number, price: number | null) => mutate(() => setCurrentPrice(id, price)),
+    updateCurrentValue: (id: number, totalValue: number) => mutate(() => setCurrentValue(id, totalValue)),
+    // operações
+    addOperation: (input: OperationInput) => mutate(() => createOperation(input)),
+    editOperation: (id: number, input: OperationInput) => mutate(() => updateOperation(id, input)),
+    removeOperation: (id: number) => mutate(() => deleteOperation(id)),
+    // rendimentos
+    addIncome: (input: AssetIncomeInput) => mutate(() => createAssetIncome(input)),
+    editIncome: (id: number, input: AssetIncomeInput) => mutate(() => updateAssetIncome(id, input)),
+    removeIncome: (id: number) => mutate(() => deleteAssetIncome(id)),
+    reload: loadAll,
   };
 }

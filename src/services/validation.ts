@@ -1,4 +1,4 @@
-import { roundMoney } from "@/utils/currency";
+import { roundMoney, roundPrice, roundQuantity } from "@/utils/currency";
 import { isValidISODate } from "@/utils/date";
 import { DomainError } from "./errors";
 
@@ -32,4 +32,24 @@ export function requireDayOfMonth(value: number, label: string): number {
 export function requireISODate(value: string, label = "Data"): string {
   if (!isValidISODate(value)) throw new DomainError(`${label} inválida.`);
   return value;
+}
+
+export function requireQuantity(value: number, label = "Quantidade"): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new DomainError(`${label} deve ser maior que zero.`);
+  }
+  return roundQuantity(value);
+}
+
+/** Preço unitário >= 0 (0 permitido, ex.: bonificação). */
+export function requirePrice(value: number, label = "Preço"): number {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new DomainError(`${label} não pode ser negativo.`);
+  }
+  return roundPrice(value);
+}
+
+export function requireFees(value: number): number {
+  if (!Number.isFinite(value) || value < 0) throw new DomainError("Taxas não podem ser negativas.");
+  return roundMoney(value);
 }

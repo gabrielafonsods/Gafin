@@ -58,3 +58,9 @@ export function monthKey(date: string): string {
 export function makeDate({ year, month }: YearMonth, day: number): string {
   return `${year}-${pad(month)}-${pad(Math.min(day, daysInMonth(year, month)))}`;
 }
+
+/** "2026-09-27" -> "27/09/2026" */
+export function formatDateBR(value: string): string {
+  const { year, month, day } = parseISODate(value);
+  return `${pad(day)}/${pad(month)}/${year}`;
+}

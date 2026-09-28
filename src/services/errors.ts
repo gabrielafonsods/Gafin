@@ -8,3 +8,10 @@ export class DomainError extends Error {
     this.name = "DomainError";
   }
 }
+
+/** Mensagem segura para mostrar ao usuário (erros inesperados viram texto genérico). */
+export function toUserMessage(error: unknown): string {
+  if (error instanceof DomainError) return error.message;
+  console.error(error);
+  return "Não foi possível concluir a operação. Tente novamente.";
+}
