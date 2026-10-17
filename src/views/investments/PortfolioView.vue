@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed } from "vue";
 import SubNav from "@/components/layout/SubNav.vue";
 import PlaceholderCard from "@/components/PlaceholderCard.vue";
 import { useInvestments } from "@/composables/useInvestments";
-import { formatCurrency } from "@/utils/currency";
+import { ASSET_TYPE_LABELS } from "@/types/investments";
+import { formatCurrency, formatPercent } from "@/utils/currency";
 
 const tabs = [
   { to: "/investimentos", label: "Dashboard" },
@@ -11,22 +11,7 @@ const tabs = [
   { to: "/investimentos/ativos", label: "Ativos" },
 ];
 
-const { investments, totalInvested } = useInvestments();
-
-const allocation = computed(() => {
-  const total = totalInvested.value;
-  return [...investments.value]
-    .map((item) => {
-      const value = item.quantity * item.averagePrice;
-      return {
-        id: item.id,
-        assetName: item.assetName,
-        value,
-        percentage: total > 0 ? (value / total) * 100 : 0,
-      };
-    })
-    .sort((a, b) => b.value - a.value);
-});
+const { summary, typeAllocation, assetAllocation } = useInvestments();
 </script>
 
 <template>
@@ -35,28 +20,48 @@ const allocation = computed(() => {
     <SubNav :items="tabs" />
 
     <article class="total-card">
-      <span class="total-card__label">Total investido</span>
-      <strong class="total-card__value">{{ formatCurrency(totalInvested) }}</strong>
+      <span class="total-card__label">Valor atual da carteira</span>
+      <strong class="total-card__value">{{ formatCurrency(summary.valorAtual) }}</strong>
+      <span class="total-card__hint">Investido: {{ formatCurrency(summary.patrimonioInvestido) }}</span>
     </article>
 
     <PlaceholderCard
-      v-if="allocation.length === 0"
+      v-if="assetAllocation.length === 0"
       title="Sua carteira está vazia"
-      hint="Cadastre ativos em Investimentos → Ativos para ver a distribuição aqui."
+      hint="Cadastre ativos e registre operações de compra em Investimentos → Ativos."
     />
 
-    <ul v-else class="allocation-list">
-      <li v-for="item in allocation" :key="item.id" class="allocation-list__item">
-        <div class="allocation-list__header">
-          <span class="allocation-list__name">{{ item.assetName }}</span>
-          <span class="allocation-list__value">{{ formatCurrency(item.value) }}</span>
-        </div>
-        <div class="allocation-list__bar">
-          <div class="allocation-list__bar-fill" :style="{ width: item.percentage + '%' }" />
-        </div>
-        <span class="allocation-list__percentage">{{ item.percentage.toFixed(1) }}% da carteira</span>
-      </li>
-    </ul>
+    <template v-else>
+      <h2 class="section__subtitle">Por tipo de investimento</h2>
+      <ul class="allocation-list">
+        <li v-for="slice in typeAllocation" :key="slice.type" class="allocation-list__item">
+          <div class="allocation-list__header">
+            <span class="allocation-list__name">{{ ASSET_TYPE_LABELS[slice.type] }}</span>
+            <span class="allocation-list__value">{{ formatCurrency(slice.value) }}</span>
+          </div>
+          <div class="allocation-list__bar">
+            <div class="allocation-list__bar-fill" :style="{ width: slice.percent + '%' }" />
+          </div>
+          <span class="allocation-list__percentage">{{ formatPercent(slice.percent) }} da carteira</span>
+        </li>
+      </ul>
+
+      <h2 class="section__subtitle">Por ativo</h2>
+      <ul class="allocation-list">
+        <li v-for="view in assetAllocation" :key="view.asset.id" class="allocation-list__item">
+          <div class="allocation-list__header">
+            <span class="allocation-list__name">
+              {{ view.asset.name }}<template v-if="view.asset.ticker"> · {{ view.asset.ticker }}</template>
+            </span>
+            <span class="allocation-list__value">{{ formatCurrency(view.currentValue) }}</span>
+          </div>
+          <div class="allocation-list__bar">
+            <div class="allocation-list__bar-fill" :style="{ width: view.sharePercent + '%' }" />
+          </div>
+          <span class="allocation-list__percentage">{{ formatPercent(view.sharePercent) }} da carteira</span>
+        </li>
+      </ul>
+    </template>
   </div>
 </template>
 
@@ -69,6 +74,11 @@ const allocation = computed(() => {
 .section__title {
   font-size: 20px;
   font-weight: 600;
+}
+.section__subtitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-muted);
 }
 
 .total-card {
@@ -89,6 +99,11 @@ const allocation = computed(() => {
 .total-card__value {
   font-size: 22px;
   font-weight: 600;
+}
+
+.total-card__hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
 }
 
 .allocation-list {
@@ -113,6 +128,7 @@ const allocation = computed(() => {
 .allocation-list__header {
   display: flex;
   justify-content: space-between;
+  gap: var(--space-3);
   font-size: 14px;
 }
 

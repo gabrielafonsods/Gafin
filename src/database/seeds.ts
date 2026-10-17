@@ -1,4 +1,4 @@
-import type { Category } from "./schema";
+import type { AppSettings, Category } from "./schema";
 
 type CategorySeed = Omit<Category, "id">;
 
@@ -27,6 +27,17 @@ export const DEFAULT_CATEGORIES: readonly CategorySeed[] = [
  * upgrade, no momento em que a store é criada — atômico e uma única vez,
  * sem risco de duplicar em reaberturas do app.
  */
+const DEFAULT_SETTINGS: AppSettings = {
+  id: "main",
+  theme: "system",
+  security: {
+    enabled: false,
+    inactivityTimeoutMinutes: 5,
+    biometricEnabled: false,
+  },
+};
+
 export const SEEDS: Record<string, readonly object[]> = {
   categories: DEFAULT_CATEGORIES,
+  settings: [DEFAULT_SETTINGS],
 };

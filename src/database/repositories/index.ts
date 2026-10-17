@@ -25,6 +25,8 @@ export const assetsRepository = new BaseRepository<Asset>("investments");
 export const investmentOperationsRepository = new BaseRepository<InvestmentOperation>(
   "investmentOperations",
 );
+export { getSettings, saveSettings } from "./settings-repository";
+
 export const investmentIncomesRepository = new BaseRepository<InvestmentIncome>(
   "investmentIncomes",
 );

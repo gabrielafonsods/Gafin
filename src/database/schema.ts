@@ -13,8 +13,9 @@ export const DB_NAME = "gafin-db";
 // dispositivo do usuário.
 // v1: accounts | v2: + investments | v3: + cards, categories, transactions,
 // invoices, transfers | v4: investments passa a ser a store de ativos
-// (migrada) + investmentOperations e investmentIncomes
-export const DB_VERSION = 4;
+// (migrada) + investmentOperations e investmentIncomes | v5: + settings
+// (aparência e bloqueio do app)
+export const DB_VERSION = 5;
 
 export interface StoreDefinition {
   name: string;
@@ -107,6 +108,11 @@ export const STORES: Record<string, StoreDefinition> = {
       { name: "by_from_account", keyPath: "fromAccountId" },
       { name: "by_to_account", keyPath: "toAccountId" },
     ],
+  },
+  // Registro único (id fixo "main"): aparência e bloqueio do app.
+  settings: {
+    name: "settings",
+    keyPath: "id",
   },
 };
 
@@ -264,4 +270,31 @@ export interface InvestmentIncome {
   date: string;
   description: string;
   createdAt: string;
+}
+
+// --- Configurações do app --------------------------------------------------
+
+export type Theme = "light" | "dark" | "system";
+
+/**
+ * Nunca guarda o PIN em texto puro: só o hash (PBKDF2) e o salt, ambos em
+ * base64. Ver services/security/pinCrypto.ts.
+ */
+export interface SecuritySettings {
+  enabled: boolean;
+  pinHash?: string;
+  pinSalt?: string;
+  pinIterations?: number;
+  /** Minutos em segundo plano até pedir o PIN de novo. 0 = só ao abrir o app. */
+  inactivityTimeoutMinutes: number;
+  biometricEnabled: boolean;
+  /** ID (base64url) da credencial WebAuthn local, se o biométrico estiver ativo. */
+  biometricCredentialId?: string;
+}
+
+/** Registro único, sempre com id "main". */
+export interface AppSettings {
+  id: "main";
+  theme: Theme;
+  security: SecuritySettings;
 }

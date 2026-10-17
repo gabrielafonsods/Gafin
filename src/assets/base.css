@@ -30,8 +30,43 @@
   --nav-height: 64px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --status-bar-bg: var(--color-bg);
 
   color-scheme: dark;
+}
+
+/* Tema claro: explícito (Aparência -> Claro) ou "Automático" seguindo o
+   sistema quando nenhum tema foi fixado. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]):not([data-theme="light"]) {
+    --color-bg: #f5f7f5;
+    --color-surface: #ffffff;
+    --color-surface-raised: #eef2ef;
+    --color-border: #dde3df;
+    --color-text: #10201a;
+    --color-text-muted: #5c6b63;
+    --color-income: #1a9d55;
+    --color-expense: #c8323d;
+    --color-brand-strong: #0b7a4b;
+    --status-bar-bg: #0b7a4b;
+
+    color-scheme: light;
+  }
+}
+
+:root[data-theme="light"] {
+  --color-bg: #f5f7f5;
+  --color-surface: #ffffff;
+  --color-surface-raised: #eef2ef;
+  --color-border: #dde3df;
+  --color-text: #10201a;
+  --color-text-muted: #5c6b63;
+  --color-income: #1a9d55;
+  --color-expense: #c8323d;
+  --color-brand-strong: #0b7a4b;
+  --status-bar-bg: #0b7a4b;
+
+  color-scheme: light;
 }
 
 * {
@@ -159,4 +194,96 @@ a {
 
 .text-expense {
   color: var(--color-expense);
+}
+
+/* ---- Cartões de Configurações ---- */
+.settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.settings-card__title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.settings-card__hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.settings-card__message {
+  font-size: 12px;
+  color: var(--color-income);
+}
+
+.settings-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.settings-card__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.settings-card__file-input {
+  display: none;
+}
+
+.settings-card__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+}
+
+.settings-card__segmented {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.settings-card__segment {
+  flex: 1;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.settings-card__segment--active {
+  background: var(--color-brand-strong);
+  border-color: var(--color-brand-strong);
+  color: var(--color-bg);
+  font-weight: 600;
+}
+
+.settings-card__about-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-brand-strong);
+}
+
+/* No app instalado a barra de status do iPhone é transparente com texto
+   branco; esta faixa garante que o relógio continue legível no tema claro.
+   Fora do modo instalado --safe-top é 0 e a faixa não aparece. */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--safe-top);
+  background: var(--status-bar-bg);
+  z-index: 1100;
+  pointer-events: none;
 }

@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { computed } from "vue";
 import SubNav from "@/components/layout/SubNav.vue";
 import { useInvestments } from "@/composables/useInvestments";
-import { formatCurrency } from "@/utils/currency";
+import { formatCurrency, formatPercent } from "@/utils/currency";
 
 const tabs = [
   { to: "/investimentos", label: "Dashboard" },
@@ -10,14 +9,7 @@ const tabs = [
   { to: "/investimentos/ativos", label: "Ativos" },
 ];
 
-const { investments, totalInvested } = useInvestments();
-
-const biggestHolding = computed(() => {
-  if (investments.value.length === 0) return null;
-  return [...investments.value].sort(
-    (a, b) => b.quantity * b.averagePrice - a.quantity * a.averagePrice,
-  )[0];
-});
+const { summary } = useInvestments();
 </script>
 
 <template>
@@ -27,26 +19,57 @@ const biggestHolding = computed(() => {
 
     <article class="summary-card summary-card--main">
       <span class="summary-card__label">Patrimônio investido</span>
-      <strong class="summary-card__value">{{ formatCurrency(totalInvested) }}</strong>
+      <strong class="summary-card__value">{{ formatCurrency(summary.patrimonioInvestido) }}</strong>
     </article>
 
     <div class="summary-grid">
       <article class="summary-card">
-        <span class="summary-card__label">Ativos cadastrados</span>
-        <strong class="summary-card__value">{{ investments.length }}</strong>
+        <span class="summary-card__label">Valor atual</span>
+        <strong class="summary-card__value">{{ formatCurrency(summary.valorAtual) }}</strong>
+      </article>
+
+      <article class="summary-card">
+        <span class="summary-card__label">Lucro/prejuízo</span>
+        <strong
+          class="summary-card__value"
+          :class="summary.lucroPrejuizo >= 0 ? 'text-income' : 'text-expense'"
+        >
+          {{ formatCurrency(summary.lucroPrejuizo) }}
+        </strong>
+      </article>
+
+      <article class="summary-card">
+        <span class="summary-card__label">Rentabilidade</span>
+        <strong
+          class="summary-card__value"
+          :class="summary.rentabilidadePercent >= 0 ? 'text-income' : 'text-expense'"
+        >
+          {{ formatPercent(summary.rentabilidadePercent) }}
+        </strong>
+      </article>
+
+      <article class="summary-card">
+        <span class="summary-card__label">Rendimentos recebidos</span>
+        <strong class="summary-card__value">{{ formatCurrency(summary.rendimentosRecebidos) }}</strong>
+      </article>
+
+      <article class="summary-card">
+        <span class="summary-card__label">Ativos em carteira</span>
+        <strong class="summary-card__value">{{ summary.quantidadeAtivos }}</strong>
       </article>
 
       <article class="summary-card">
         <span class="summary-card__label">Maior posição</span>
         <strong class="summary-card__value summary-card__value--small">
-          {{ biggestHolding ? biggestHolding.assetName : "—" }}
+          {{ summary.maiorPosicao ? summary.maiorPosicao.asset.name : "—" }}
         </strong>
+        <span v-if="summary.maiorPosicao" class="summary-card__hint">
+          {{ formatPercent(summary.maiorPosicao.sharePercent) }} da carteira
+        </span>
       </article>
     </div>
 
-    <RouterLink to="/investimentos/ativos" class="cta-link">
-      Gerenciar ativos →
-    </RouterLink>
+    <RouterLink to="/investimentos/ativos" class="cta-link">Gerenciar ativos →</RouterLink>
   </div>
 </template>
 
@@ -93,6 +116,11 @@ const biggestHolding = computed(() => {
 
 .summary-card__value--small {
   font-size: 15px;
+}
+
+.summary-card__hint {
+  font-size: 11px;
+  color: var(--color-text-muted);
 }
 
 .cta-link {
