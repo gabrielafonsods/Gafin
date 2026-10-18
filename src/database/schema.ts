@@ -130,6 +130,8 @@ export interface Account {
   type: AccountType;
   /** Saldo na criação da conta. O saldo atual é derivado (balanceCalculator). */
   initialBalance: number;
+  /** Arquivada: some das listas e não recebe lançamentos (só com saldo zero). */
+  archived?: boolean;
   createdAt: string;
 }
 
@@ -139,6 +141,8 @@ export interface Card {
   limit: number;
   closingDay: number;
   dueDay: number;
+  /** Arquivado: some das listas e não recebe compras (só sem fatura em aberto). */
+  archived?: boolean;
   createdAt: string;
 }
 
@@ -180,12 +184,24 @@ export interface AccountExpenseTransaction extends TransactionBase {
   accountId: number;
 }
 
+/** Presente quando a compra foi parcelada: cada parcela é uma transação. */
+export interface InstallmentInfo {
+  /** Liga todas as parcelas da mesma compra. */
+  groupId: string;
+  /** 1..count */
+  number: number;
+  count: number;
+  /** Valor total da compra (a soma das parcelas). */
+  totalAmount: number;
+}
+
 /** Compra no cartão: NÃO mexe no saldo da conta, entra na fatura. */
 export interface CardExpenseTransaction extends TransactionBase {
   type: "saida";
   paymentMethod: "cartao";
   cardId: number;
   invoiceId: number;
+  installment?: InstallmentInfo;
 }
 
 export type ExpenseTransaction = AccountExpenseTransaction | CardExpenseTransaction;

@@ -64,3 +64,24 @@ export function formatDateBR(value: string): string {
   const { year, month, day } = parseISODate(value);
   return `${pad(day)}/${pad(month)}/${year}`;
 }
+
+/** "2026-09" + 1 -> "2026-10" */
+export function shiftMonthKey(key: string, delta: number): string {
+  const [year, month] = key.split("-").map(Number);
+  return toMonthKey(shiftMonth({ year: year ?? 0, month: month ?? 1 }, delta));
+}
+
+/** "2026-09" -> "setembro de 2026" */
+export function formatMonthLabel(key: string): string {
+  const [year, month] = key.split("-").map(Number);
+  return new Date(year ?? 0, (month ?? 1) - 1, 1).toLocaleDateString("pt-BR", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+/** Mesmo dia, `delta` meses depois (dia 31 vira o último dia do mês mais curto). */
+export function shiftDateByMonths(date: string, delta: number): string {
+  const { year, month, day } = parseISODate(date);
+  return makeDate(shiftMonth({ year, month }, delta), day);
+}

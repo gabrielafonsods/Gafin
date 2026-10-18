@@ -287,3 +287,173 @@ body::before {
   z-index: 1100;
   pointer-events: none;
 }
+
+/* ---- Páginas, listas, números e chips (módulo Saldo) ---- */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.page-title {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.empty-note {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.stat-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.stat-card--wide {
+  grid-column: span 2;
+  background: linear-gradient(155deg, var(--color-surface-raised), var(--color-surface));
+}
+
+.stat-card__label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.stat-card__value {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.stat-card__hint {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.list-row {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  text-align: left;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+
+.list-row__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.list-row__title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.list-row__sub {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.list-row__side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.list-row__amount {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.list-row__actions {
+  flex-basis: 100%;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-4);
+}
+
+.chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.chip--ok {
+  color: var(--color-income);
+  border-color: var(--color-income);
+}
+
+.chip--warn {
+  color: var(--color-expense);
+  border-color: var(--color-expense);
+}
+
+.progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+.progress__fill {
+  height: 100%;
+  background: var(--color-brand-strong);
+  border-radius: 999px;
+}
+
+.progress__fill--danger {
+  background: var(--color-expense);
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+  color: var(--color-text-muted);
+}

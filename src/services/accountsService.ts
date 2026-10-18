@@ -5,7 +5,10 @@ import {
   transfersRepository,
 } from "@/database/repositories";
 import type { Account, AccountType } from "@/database/schema";
+import { formatCurrency } from "@/utils/currency";
+import { getAccountBalance } from "./balanceCalculator";
 import { DomainError } from "./errors";
+import { loadFinanceSnapshot } from "./financeSnapshot";
 import { requireMoney, requireText } from "./validation";
 
 export interface AccountInput {
@@ -31,7 +34,36 @@ export async function createAccount(input: AccountInput): Promise<number> {
 export async function updateAccount(id: number, input: AccountInput): Promise<void> {
   const existing = await accountsRepository.getById(id);
   if (!existing) throw new DomainError("Conta não encontrada.");
-  await accountsRepository.update({ ...normalize(input), id, createdAt: existing.createdAt });
+  await accountsRepository.update({
+    ...normalize(input),
+    ...(existing.archived ? { archived: true } : {}),
+    id,
+    createdAt: existing.createdAt,
+  });
+}
+
+/**
+ * Arquivar tira a conta das listas e dos formulários sem apagar o histórico.
+ * Só com saldo zero, para o saldo total nunca esconder dinheiro.
+ */
+export async function archiveAccount(id: number): Promise<void> {
+  const account = await accountsRepository.getById(id);
+  if (!account) throw new DomainError("Conta não encontrada.");
+
+  const balance = getAccountBalance(account, await loadFinanceSnapshot());
+  if (Math.abs(balance) >= 0.005) {
+    throw new DomainError(
+      `Esta conta ainda tem saldo de ${formatCurrency(balance)}. Transfira ou ajuste o saldo para zero antes de arquivar.`,
+    );
+  }
+  await accountsRepository.update({ ...account, archived: true });
+}
+
+export async function unarchiveAccount(id: number): Promise<void> {
+  const account = await accountsRepository.getById(id);
+  if (!account) throw new DomainError("Conta não encontrada.");
+  const { archived: _archived, ...rest } = account;
+  await accountsRepository.update(rest);
 }
 
 /**
@@ -47,7 +79,7 @@ export async function deleteAccount(id: number): Promise<void> {
   ]);
   if (transactions + sent + received + invoicePayments > 0) {
     throw new DomainError(
-      "Esta conta possui movimentações e não pode ser excluída. Exclua ou mova os lançamentos antes.",
+      "Esta conta possui movimentações e não pode ser excluída. Se não a usa mais, arquive-a.",
     );
   }
   await accountsRepository.remove(id);

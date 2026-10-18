@@ -63,6 +63,7 @@ export async function buildExportTables(): Promise<ExportTable[]> {
       t.description,
       PAYMENT_METHOD_LABELS[t.paymentMethod],
       t.paymentMethod === "cartao" ? cardById.get(t.cardId)?.name || "" : accountById.get(t.accountId)?.name || "",
+      t.paymentMethod === "cartao" && t.installment ? `${t.installment.number}/${t.installment.count}` : "",
     ]);
 
   const accountRows = accounts.map((a) => [
@@ -110,7 +111,7 @@ export async function buildExportTables(): Promise<ExportTable[]> {
     { name: "Entradas", columns: ["Valor", "Data", "Categoria", "Descrição", "Conta de destino"], rows: incomeRows },
     {
       name: "Saídas",
-      columns: ["Valor", "Data", "Categoria", "Descrição", "Forma de pagamento", "Conta/cartão"],
+      columns: ["Valor", "Data", "Categoria", "Descrição", "Forma de pagamento", "Conta/cartão", "Parcela"],
       rows: expenseRows,
     },
     { name: "Contas", columns: ["Nome", "Tipo", "Saldo"], rows: accountRows },

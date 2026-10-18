@@ -16,17 +16,36 @@ import type {
   Transfer,
 } from "@/database/schema";
 import {
+  archiveAccount,
+  createAccount,
+  deleteAccount,
+  unarchiveAccount,
+  updateAccount,
+  type AccountInput,
+} from "@/services/accountsService";
+import {
   getAccountBalance,
   getCardLimitUsage,
-  getInvoiceStatus,
-  getInvoiceTotal,
   getMonthlySummary,
   type FinanceSnapshot,
 } from "@/services/balanceCalculator";
-import { roundMoney } from "@/utils/currency";
-import { monthKey, todayISO } from "@/utils/date";
-import { createAccount, deleteAccount, updateAccount, type AccountInput } from "@/services/accountsService";
-import { createCard, deleteCard, updateCard, type CardInput } from "@/services/cardsService";
+import {
+  buildInvoiceViews,
+  buildStatement,
+  getCategoryBreakdown,
+  getInvoiceItems,
+  getUpcomingInvoices,
+  type StatementFilter,
+} from "@/services/balanceViews";
+import {
+  archiveCard,
+  createCard,
+  deleteCard,
+  unarchiveCard,
+  updateCard,
+  type CardInput,
+} from "@/services/cardsService";
+import { DomainError } from "@/services/errors";
 import { payInvoice, undoInvoicePayment } from "@/services/invoicesService";
 import {
   createExpense,
@@ -37,8 +56,14 @@ import {
   type ExpenseInput,
   type IncomeInput,
 } from "@/services/transactionsService";
-import { createTransfer, deleteTransfer, type TransferInput } from "@/services/transfersService";
-import { DomainError } from "@/services/errors";
+import {
+  createTransfer,
+  deleteTransfer,
+  updateTransfer,
+  type TransferInput,
+} from "@/services/transfersService";
+import { roundMoney } from "@/utils/currency";
+import { monthKey, todayISO } from "@/utils/date";
 
 /*
  * Estado compartilhado do módulo Saldo (mesmo padrão do useInvestments:
@@ -104,23 +129,34 @@ const cardUsage = computed(() =>
   cards.value.map((card) => ({ card, ...getCardLimitUsage(card, snapshot.value) })),
 );
 
-/** Faturas com total e status, da mais recente para a mais antiga. */
-const invoiceViews = computed(() => {
-  const today = todayISO();
-  return invoices.value
-    .map((invoice) => ({
-      invoice,
-      total: getInvoiceTotal(invoice, transactions.value),
-      status: getInvoiceStatus(invoice, today),
-    }))
-    .sort((a, b) => b.invoice.dueDate.localeCompare(a.invoice.dueDate));
-});
+/** Contas e cartões arquivados não aparecem nos formulários de lançamento. */
+const activeAccounts = computed(() => accounts.value.filter((a) => !a.archived));
+const activeCards = computed(() => cards.value.filter((c) => !c.archived));
+
+/** Faturas com cartão, total e status, da mais recente para a mais antiga. */
+const invoiceViews = computed(() =>
+  buildInvoiceViews(snapshot.value, todayISO()).sort((a, b) =>
+    b.invoice.dueDate.localeCompare(a.invoice.dueDate),
+  ),
+);
+
+/** Faturas a pagar (com compras), pelo vencimento mais próximo. */
+const upcomingInvoices = computed(() => getUpcomingInvoices(snapshot.value, todayISO()));
 
 const incomeCategories = computed(() => categories.value.filter((c) => c.kind === "entrada"));
 const expenseCategories = computed(() => categories.value.filter((c) => c.kind === "saida"));
 
-/** Resumo do mês corrente, usado pelo Dashboard. */
+/** Resumo do mês corrente, usado pelo Dashboard do Início. */
 const summary = computed(() => getMonthlySummary(snapshot.value, monthKey(todayISO())));
+
+/** Resumo de qualquer mês ("YYYY-MM"), para as telas com navegação de mês. */
+const summaryFor = (month: string) => getMonthlySummary(snapshot.value, month);
+const breakdownFor = (month: string, kind: "entrada" | "saida") =>
+  getCategoryBreakdown(snapshot.value, categories.value, month, kind);
+const statementFor = (filter: StatementFilter = {}) =>
+  buildStatement(snapshot.value, categories.value, filter);
+const invoiceItemsFor = (invoice: Invoice) =>
+  getInvoiceItems(invoice, transactions.value, categories.value);
 
 export interface AccountFormInput {
   name: string;
@@ -165,18 +201,29 @@ export function useBalance() {
     // derivados
     accountBalances,
     cardUsage,
+    activeAccounts,
+    activeCards,
     invoiceViews,
+    upcomingInvoices,
     incomeCategories,
     expenseCategories,
     summary,
+    summaryFor,
+    breakdownFor,
+    statementFor,
+    invoiceItemsFor,
     // contas
     addAccount,
     editAccount,
     removeAccount: (id: number) => mutate(() => deleteAccount(id)),
+    archiveAccount: (id: number) => mutate(() => archiveAccount(id)),
+    unarchiveAccount: (id: number) => mutate(() => unarchiveAccount(id)),
     // cartões
     addCard: (input: CardInput) => mutate(() => createCard(input)),
     editCard: (id: number, input: CardInput) => mutate(() => updateCard(id, input)),
     removeCard: (id: number) => mutate(() => deleteCard(id)),
+    archiveCard: (id: number) => mutate(() => archiveCard(id)),
+    unarchiveCard: (id: number) => mutate(() => unarchiveCard(id)),
     // entradas e saídas
     addIncome: (input: IncomeInput) => mutate(() => createIncome(input)),
     editIncome: (id: number, input: IncomeInput) => mutate(() => updateIncome(id, input)),
@@ -185,6 +232,7 @@ export function useBalance() {
     removeTransaction: (id: number) => mutate(() => deleteTransaction(id)),
     // transferências entre contas
     addTransfer: (input: TransferInput) => mutate(() => createTransfer(input)),
+    editTransfer: (id: number, input: TransferInput) => mutate(() => updateTransfer(id, input)),
     removeTransfer: (id: number) => mutate(() => deleteTransfer(id)),
     // faturas
     payInvoice: (invoiceId: number, accountId: number, paidAt?: string) =>

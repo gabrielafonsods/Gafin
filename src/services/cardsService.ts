@@ -4,7 +4,9 @@ import {
   transactionsRepository,
 } from "@/database/repositories";
 import type { Card } from "@/database/schema";
+import { getCardLimitUsage } from "./balanceCalculator";
 import { DomainError } from "./errors";
+import { loadFinanceSnapshot } from "./financeSnapshot";
 import { requireDayOfMonth, requirePositiveMoney, requireText } from "./validation";
 
 export interface CardInput {
@@ -35,7 +37,31 @@ export async function createCard(input: CardInput): Promise<number> {
 export async function updateCard(id: number, input: CardInput): Promise<void> {
   const existing = await cardsRepository.getById(id);
   if (!existing) throw new DomainError("Cartão não encontrado.");
-  await cardsRepository.update({ ...normalize(input), id, createdAt: existing.createdAt });
+  await cardsRepository.update({
+    ...normalize(input),
+    ...(existing.archived ? { archived: true } : {}),
+    id,
+    createdAt: existing.createdAt,
+  });
+}
+
+/** Só sem fatura em aberto: o limite usado precisa estar zerado. */
+export async function archiveCard(id: number): Promise<void> {
+  const card = await cardsRepository.getById(id);
+  if (!card) throw new DomainError("Cartão não encontrado.");
+
+  const { used } = getCardLimitUsage(card, await loadFinanceSnapshot());
+  if (used > 0) {
+    throw new DomainError("Este cartão ainda tem fatura em aberto. Pague as faturas antes de arquivar.");
+  }
+  await cardsRepository.update({ ...card, archived: true });
+}
+
+export async function unarchiveCard(id: number): Promise<void> {
+  const card = await cardsRepository.getById(id);
+  if (!card) throw new DomainError("Cartão não encontrado.");
+  const { archived: _archived, ...rest } = card;
+  await cardsRepository.update(rest);
 }
 
 export async function deleteCard(id: number): Promise<void> {
@@ -45,7 +71,7 @@ export async function deleteCard(id: number): Promise<void> {
   ]);
   if (purchases + invoices > 0) {
     throw new DomainError(
-      "Este cartão possui compras ou faturas e não pode ser excluído. Exclua os lançamentos antes.",
+      "Este cartão possui compras ou faturas e não pode ser excluído. Se não o usa mais, arquive-o.",
     );
   }
   await cardsRepository.remove(id);

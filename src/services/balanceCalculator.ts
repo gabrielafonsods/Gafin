@@ -1,4 +1,5 @@
 import { roundMoney } from "@/utils/currency";
+import { todayISO } from "@/utils/date";
 import type {
   Account,
   AccountExpenseTransaction,
@@ -92,13 +93,42 @@ export function getUnpaidInvoicesTotal(snapshot: FinanceSnapshot): number {
   );
 }
 
+/**
+ * Faturas que já pesam no curto prazo: todas as fechadas e ainda não pagas,
+ * mais a fatura aberta mais próxima de cada cartão. Parcelas de ciclos
+ * futuros ficam de fora (seguem consumindo o limite, mas ainda não vencem).
+ */
+export function getCommittedInvoicesTotal(snapshot: FinanceSnapshot, today: string): number {
+  const committed: Invoice[] = [];
+
+  for (const card of snapshot.cards) {
+    const unpaid = snapshot.invoices
+      .filter((inv) => inv.cardId === card.id && !inv.paidAt)
+      .sort((a, b) => a.closingDate.localeCompare(b.closingDate));
+
+    let openIncluded = false;
+    for (const invoice of unpaid) {
+      if (getInvoiceStatus(invoice, today) === "fechada") {
+        committed.push(invoice);
+      } else if (!openIncluded) {
+        committed.push(invoice);
+        openIncluded = true;
+      }
+    }
+  }
+
+  return sumMoney(committed.map((inv) => getInvoiceTotal(inv, snapshot.transactions)));
+}
+
 export interface BalanceSummary {
   /** Soma dos saldos de todas as contas. */
   saldoTotal: number;
-  /** Saldo total menos o que já está comprometido em faturas não pagas. */
+  /** Saldo total menos as faturas comprometidas (fechadas + a aberta atual). */
   saldoDisponivel: number;
-  /** Faturas de cartão ainda não pagas (todas). */
+  /** Faturas de cartão ainda não pagas (todas, inclusive parcelas futuras). */
   faturasEmAberto: number;
+  /** Parte das faturas em aberto que já pesa no curto prazo. */
+  faturasComprometidas: number;
   /** Entradas reais do mês (transferências entre contas não entram). */
   entradasMes: number;
   /** Saídas reais do mês: dinheiro/PIX + faturas pagas no mês. */
@@ -108,11 +138,16 @@ export interface BalanceSummary {
 }
 
 /** `month` no formato "YYYY-MM". */
-export function getMonthlySummary(snapshot: FinanceSnapshot, month: string): BalanceSummary {
+export function getMonthlySummary(
+  snapshot: FinanceSnapshot,
+  month: string,
+  today: string = todayISO(),
+): BalanceSummary {
   const inMonth = (date: string) => date.startsWith(month);
 
   const saldoTotal = sumMoney(snapshot.accounts.map((a) => getAccountBalance(a, snapshot)));
   const faturasEmAberto = getUnpaidInvoicesTotal(snapshot);
+  const faturasComprometidas = getCommittedInvoicesTotal(snapshot, today);
 
   const entradasMes = sumMoney(
     snapshot.transactions.filter((t) => t.type === "entrada" && inMonth(t.date)).map((t) => t.amount),
@@ -131,8 +166,9 @@ export function getMonthlySummary(snapshot: FinanceSnapshot, month: string): Bal
 
   return {
     saldoTotal,
-    saldoDisponivel: roundMoney(saldoTotal - faturasEmAberto),
+    saldoDisponivel: roundMoney(saldoTotal - faturasComprometidas),
     faturasEmAberto,
+    faturasComprometidas,
     entradasMes,
     saidasMes: roundMoney(saidasConta + faturasPagasNoMes),
     gastosCartaoMes,

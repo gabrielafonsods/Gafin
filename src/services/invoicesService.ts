@@ -6,18 +6,14 @@ import {
 import type { Card, Invoice } from "@/database/schema";
 import { getInvoiceStatus, getInvoiceTotal } from "./balanceCalculator";
 import { DomainError } from "./errors";
-import { resolveInvoiceCycle } from "./invoiceCycle";
+import { resolveInvoiceCycle, type InvoiceCycle } from "./invoiceCycle";
 import { requireISODate } from "./validation";
 import { todayISO } from "@/utils/date";
 
-/** Fatura do ciclo em que a compra cai; cria o registro se ainda não existir. */
-export async function getOrCreateInvoiceForPurchase(
-  card: Card,
-  purchaseDate: string,
-): Promise<Invoice> {
+/** Fatura do ciclo informado; cria o registro se ainda não existir. */
+export async function getOrCreateInvoiceForCycle(card: Card, cycle: InvoiceCycle): Promise<Invoice> {
   if (card.id === undefined) throw new DomainError("Cartão inválido.");
 
-  const cycle = resolveInvoiceCycle(purchaseDate, card.closingDay, card.dueDay);
   const existing = await invoicesRepository.getOneByIndex("by_card_month", [
     card.id,
     cycle.referenceMonth,
@@ -27,6 +23,14 @@ export async function getOrCreateInvoiceForPurchase(
   const invoice: Invoice = { cardId: card.id, ...cycle };
   const id = await invoicesRepository.create(invoice);
   return { ...invoice, id };
+}
+
+/** Fatura do ciclo em que a compra cai; cria o registro se ainda não existir. */
+export async function getOrCreateInvoiceForPurchase(
+  card: Card,
+  purchaseDate: string,
+): Promise<Invoice> {
+  return getOrCreateInvoiceForCycle(card, resolveInvoiceCycle(purchaseDate, card.closingDay, card.dueDay));
 }
 
 async function loadInvoiceTotal(invoice: Invoice): Promise<number> {

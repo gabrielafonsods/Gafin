@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import PlaceholderCard from "@/components/PlaceholderCard.vue";
 import { useBalance } from "@/composables/useBalance";
 import { useInvestments } from "@/composables/useInvestments";
 import { formatCurrency } from "@/utils/currency";
+import { formatDateBR } from "@/utils/date";
 
-const { summary: balanceSummary } = useBalance();
+const { summary: balanceSummary, upcomingInvoices } = useBalance();
 const { totalInvested } = useInvestments();
 
 // Tudo aqui vem do banco local: saldos e movimentações do mês (useBalance)
@@ -63,10 +63,21 @@ const summary = computed(() => ({
       </article>
     </section>
 
-    <PlaceholderCard
-      title="Próximas faturas"
-      hint="Lista de faturas em aberto aparecerá aqui quando cartões e faturas forem implementados."
-    />
+    <section class="home__invoices">
+      <h2 class="section-title">Próximas faturas</h2>
+      <p v-if="upcomingInvoices.length === 0" class="empty-note">Nenhuma fatura a pagar.</p>
+      <ul v-else class="list">
+        <li v-for="view in upcomingInvoices.slice(0, 3)" :key="view.invoice.id" class="list-row">
+          <div class="list-row__main">
+            <span class="list-row__title">{{ view.card?.name ?? "Cartão" }}</span>
+            <span class="list-row__sub">
+              {{ view.status === "fechada" ? "Fechada" : "Aberta" }} · vence {{ formatDateBR(view.invoice.dueDate) }}
+            </span>
+          </div>
+          <span class="list-row__amount">{{ formatCurrency(view.total) }}</span>
+        </li>
+      </ul>
+    </section>
   </div>
 </template>
 
