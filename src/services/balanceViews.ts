@@ -42,6 +42,8 @@ export interface StatementEntry {
   transactionId?: number;
   transferId?: number;
   invoiceId?: number;
+  /** Gerado por um lançamento recorrente. */
+  recurring?: boolean;
   sortKey: string;
 }
 
@@ -80,6 +82,7 @@ export function buildStatement(
       title: categoryLabel(t, categories),
       amount: t.amount,
       transactionId: t.id,
+      recurring: t.recurrenceId !== undefined,
       sortKey: `${t.date}|${t.createdAt}|${t.id ?? 0}`,
     };
 
@@ -172,6 +175,44 @@ export interface CategorySlice {
   name: string;
   total: number;
   percent: number;
+}
+
+export interface BudgetProgress {
+  categoryId: number;
+  name: string;
+  budget: number;
+  spent: number;
+  /** Pode passar de 100 (estourou o orçamento). */
+  percent: number;
+  /** Negativo quando estourou. */
+  remaining: number;
+}
+
+/** Quanto cada categoria com orçamento já gastou no mês (compras no cartão incluídas, pela data da parcela). */
+export function getBudgetProgress(
+  snapshot: FinanceSnapshot,
+  categories: readonly Category[],
+  month: string,
+): BudgetProgress[] {
+  return categories
+    .filter((c) => c.kind === "saida" && !c.archived && c.monthlyBudget !== undefined && c.monthlyBudget > 0)
+    .map((category) => {
+      const budget = category.monthlyBudget as number;
+      const spent = sumMoney(
+        snapshot.transactions
+          .filter((t) => t.type === "saida" && t.categoryId === category.id && t.date.startsWith(month))
+          .map((t) => t.amount),
+      );
+      return {
+        categoryId: category.id as number,
+        name: category.name,
+        budget,
+        spent,
+        percent: (spent / budget) * 100,
+        remaining: roundMoney(budget - spent),
+      };
+    })
+    .sort((a, b) => b.percent - a.percent);
 }
 
 /**

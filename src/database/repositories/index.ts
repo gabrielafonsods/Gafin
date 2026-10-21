@@ -7,6 +7,7 @@ import type {
   InvestmentIncome,
   InvestmentOperation,
   Invoice,
+  Recurrence,
   Transaction,
   Transfer,
 } from "../schema";
@@ -18,6 +19,7 @@ import type {
 export const accountsRepository = new BaseRepository<Account>("accounts");
 export const cardsRepository = new BaseRepository<Card>("cards");
 export const categoriesRepository = new BaseRepository<Category>("categories");
+export const recurrencesRepository = new BaseRepository<Recurrence>("recurrences");
 export const transactionsRepository = new BaseRepository<Transaction>("transactions");
 export const invoicesRepository = new BaseRepository<Invoice>("invoices");
 export const transfersRepository = new BaseRepository<Transfer>("transfers");

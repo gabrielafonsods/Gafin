@@ -9,6 +9,7 @@ import { formatCurrency } from "@/utils/currency";
 import { getAccountBalance } from "./balanceCalculator";
 import { DomainError } from "./errors";
 import { loadFinanceSnapshot } from "./financeSnapshot";
+import { countRecurrencesUsing } from "./recurrencesService";
 import { requireMoney, requireText } from "./validation";
 
 export interface AccountInput {
@@ -50,6 +51,9 @@ export async function archiveAccount(id: number): Promise<void> {
   const account = await accountsRepository.getById(id);
   if (!account) throw new DomainError("Conta não encontrada.");
 
+  if ((await countRecurrencesUsing({ accountId: id })) > 0) {
+    throw new DomainError("Esta conta é usada em lançamentos recorrentes. Exclua as recorrências antes.");
+  }
   const balance = getAccountBalance(account, await loadFinanceSnapshot());
   if (Math.abs(balance) >= 0.005) {
     throw new DomainError(
@@ -77,6 +81,10 @@ export async function deleteAccount(id: number): Promise<void> {
     transfersRepository.countByIndex("by_to_account", id),
     invoicesRepository.countByIndex("by_paid_account", id),
   ]);
+  const rules = await countRecurrencesUsing({ accountId: id });
+  if (rules > 0) {
+    throw new DomainError("Esta conta é usada em lançamentos recorrentes. Exclua as recorrências antes.");
+  }
   if (transactions + sent + received + invoicePayments > 0) {
     throw new DomainError(
       "Esta conta possui movimentações e não pode ser excluída. Se não a usa mais, arquive-a.",

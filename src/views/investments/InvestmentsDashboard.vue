@@ -1,7 +1,11 @@
 <script setup lang="ts">
+import LineChart from "@/components/charts/LineChart.vue";
 import SubNav from "@/components/layout/SubNav.vue";
+import { computed } from "vue";
+import { useEvolution } from "@/composables/useEvolution";
 import { useInvestments } from "@/composables/useInvestments";
 import { formatCurrency, formatPercent } from "@/utils/currency";
+import { formatMonthShort, monthKey, todayISO } from "@/utils/date";
 
 const tabs = [
   { to: "/investimentos", label: "Dashboard" },
@@ -10,6 +14,14 @@ const tabs = [
 ];
 
 const { summary } = useInvestments();
+const evolution = useEvolution();
+
+// Só há histórico de custo (não de cotações): mostra quanto estava investido em cada mês.
+const investedPoints = computed(() =>
+  evolution
+    .invested(monthKey(todayISO()), 12)
+    .map((p) => ({ label: formatMonthShort(p.month), value: p.invested })),
+);
 </script>
 
 <template>
@@ -68,6 +80,8 @@ const { summary } = useInvestments();
         </span>
       </article>
     </div>
+
+    <LineChart title="Investido ao longo do tempo (custo, 12 meses)" :points="investedPoints" />
 
     <RouterLink to="/investimentos/ativos" class="cta-link">Gerenciar ativos →</RouterLink>
   </div>

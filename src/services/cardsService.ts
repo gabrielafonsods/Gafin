@@ -7,6 +7,7 @@ import type { Card } from "@/database/schema";
 import { getCardLimitUsage } from "./balanceCalculator";
 import { DomainError } from "./errors";
 import { loadFinanceSnapshot } from "./financeSnapshot";
+import { countRecurrencesUsing } from "./recurrencesService";
 import { requireDayOfMonth, requirePositiveMoney, requireText } from "./validation";
 
 export interface CardInput {
@@ -50,6 +51,9 @@ export async function archiveCard(id: number): Promise<void> {
   const card = await cardsRepository.getById(id);
   if (!card) throw new DomainError("Cartão não encontrado.");
 
+  if ((await countRecurrencesUsing({ cardId: id })) > 0) {
+    throw new DomainError("Este cartão é usado em lançamentos recorrentes. Exclua as recorrências antes.");
+  }
   const { used } = getCardLimitUsage(card, await loadFinanceSnapshot());
   if (used > 0) {
     throw new DomainError("Este cartão ainda tem fatura em aberto. Pague as faturas antes de arquivar.");
@@ -69,6 +73,9 @@ export async function deleteCard(id: number): Promise<void> {
     transactionsRepository.countByIndex("by_card", id),
     invoicesRepository.countByIndex("by_card", id),
   ]);
+  if ((await countRecurrencesUsing({ cardId: id })) > 0) {
+    throw new DomainError("Este cartão é usado em lançamentos recorrentes. Exclua as recorrências antes.");
+  }
   if (purchases + invoices > 0) {
     throw new DomainError(
       "Este cartão possui compras ou faturas e não pode ser excluído. Se não o usa mais, arquive-o.",

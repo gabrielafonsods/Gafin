@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import LineChart from "@/components/charts/LineChart.vue";
 import { useBalance } from "@/composables/useBalance";
+import { useEvolution } from "@/composables/useEvolution";
 import { useInvestments } from "@/composables/useInvestments";
 import { formatCurrency } from "@/utils/currency";
-import { formatDateBR } from "@/utils/date";
+import { formatDateBR, formatMonthShort, monthKey, todayISO } from "@/utils/date";
 
 const { summary: balanceSummary, upcomingInvoices } = useBalance();
-const { totalInvested } = useInvestments();
+const { totalInvested, summary: investmentsSummary } = useInvestments();
+const evolution = useEvolution();
 
 // Tudo aqui vem do banco local: saldos e movimentações do mês (useBalance)
 // e patrimônio investido (useInvestments).
@@ -17,7 +20,15 @@ const summary = computed(() => ({
   saidasMes: balanceSummary.value.saidasMes,
   gastosCartao: balanceSummary.value.gastosCartaoMes,
   patrimonioInvestido: totalInvested.value,
+  // Contas + investimentos pelo valor atual (cotação informada; sem ela, o custo).
+  patrimonioTotal: balanceSummary.value.saldoTotal + investmentsSummary.value.valorAtual,
 }));
+
+const wealthPoints = computed(() =>
+  evolution
+    .wealth(monthKey(todayISO()), 12)
+    .map((p) => ({ label: formatMonthShort(p.month), value: p.total })),
+);
 </script>
 
 <template>
@@ -29,6 +40,12 @@ const summary = computed(() => ({
 
     <section class="home__grid">
       <article class="summary-card summary-card--main">
+        <span class="summary-card__label">Patrimônio total</span>
+        <strong class="summary-card__value">{{ formatCurrency(summary.patrimonioTotal) }}</strong>
+        <span class="summary-card__hint">Contas + investimentos (valor atual)</span>
+      </article>
+
+      <article class="summary-card">
         <span class="summary-card__label">Saldo total</span>
         <strong class="summary-card__value">{{ formatCurrency(summary.saldoTotal) }}</strong>
       </article>
@@ -62,6 +79,8 @@ const summary = computed(() => ({
         <strong class="summary-card__value">{{ formatCurrency(summary.patrimonioInvestido) }}</strong>
       </article>
     </section>
+
+    <LineChart title="Evolução do patrimônio (12 meses, investido pelo custo)" :points="wealthPoints" />
 
     <section class="home__invoices">
       <h2 class="section-title">Próximas faturas</h2>
@@ -138,5 +157,10 @@ const summary = computed(() => ({
 
 .summary-card__value--expense {
   color: var(--color-expense);
+}
+
+.summary-card__hint {
+  font-size: 11px;
+  color: var(--color-text-muted);
 }
 </style>

@@ -36,3 +36,15 @@ const quantityFormatter = new Intl.NumberFormat("pt-BR", { maximumFractionDigits
 export function formatQuantity(value: number): string {
   return quantityFormatter.format(value);
 }
+
+const compactFormatter = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+/** "R$ 1,5 mil" — para rótulos de gráfico, onde falta espaço. */
+export function formatCompactCurrency(value: number): string {
+  return compactFormatter.format(value);
+}

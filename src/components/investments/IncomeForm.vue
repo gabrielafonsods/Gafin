@@ -4,31 +4,40 @@ import { useInvestments } from "@/composables/useInvestments";
 import { toUserMessage } from "@/services/errors";
 import { INCOME_TYPES, INCOME_TYPE_LABELS } from "@/types/investments";
 import { todayISO } from "@/utils/date";
-import type { IncomeType } from "@/database/schema";
+import type { IncomeType, InvestmentIncome } from "@/database/schema";
 
-const props = defineProps<{ assetId: number }>();
-const { addIncome } = useInvestments();
+const props = defineProps<{ assetId: number; income?: InvestmentIncome | null }>();
+const emit = defineEmits<{ saved: []; cancel: [] }>();
+
+const { addIncome, editIncome } = useInvestments();
+const editing = props.income ?? null;
 
 const form = reactive({
-  type: "dividendo" as IncomeType,
-  amount: "",
-  date: todayISO(),
-  description: "",
+  type: (editing?.type ?? "dividendo") as IncomeType,
+  amount: editing ? String(editing.amount) : "",
+  date: editing?.date ?? todayISO(),
+  description: editing?.description ?? "",
 });
 const error = ref("");
 
 async function handleSubmit() {
   error.value = "";
+  const input = {
+    assetId: props.assetId,
+    type: form.type,
+    amount: Number(form.amount),
+    date: form.date,
+    description: form.description,
+  };
   try {
-    await addIncome({
-      assetId: props.assetId,
-      type: form.type,
-      amount: Number(form.amount),
-      date: form.date,
-      description: form.description,
-    });
-    form.amount = "";
-    form.description = "";
+    if (editing?.id !== undefined) {
+      await editIncome(editing.id, input);
+    } else {
+      await addIncome(input);
+      form.amount = "";
+      form.description = "";
+    }
+    emit("saved");
   } catch (e) {
     error.value = toUserMessage(e);
   }
@@ -59,7 +68,8 @@ async function handleSubmit() {
     <p v-if="error" class="form-error">{{ error }}</p>
 
     <div class="form-actions">
-      <button type="submit" class="btn-primary">Registrar rendimento</button>
+      <button type="submit" class="btn-primary">{{ editing ? "Salvar alterações" : "Registrar rendimento" }}</button>
+      <button v-if="editing" type="button" class="btn-secondary" @click="emit('cancel')">Cancelar</button>
     </div>
   </form>
 </template>

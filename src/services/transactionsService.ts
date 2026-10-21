@@ -29,6 +29,8 @@ interface CommonInput {
   description: string;
   /** Descrição personalizada para categorias "Outros". */
   customCategory?: string;
+  /** Preenchido pelo gerador de recorrências: de qual regra/data veio. */
+  recurrence?: { ruleId: number; date: string };
 }
 
 export interface IncomeInput extends CommonInput {
@@ -60,7 +62,7 @@ function newGroupId(): string {
   );
 }
 
-async function buildCommon(input: CommonInput, kind: CategoryKind) {
+export async function buildCommon(input: CommonInput, kind: CategoryKind) {
   const amount = requirePositiveMoney(input.amount, "Valor");
   const date = requireISODate(input.date);
 
@@ -74,7 +76,17 @@ async function buildCommon(input: CommonInput, kind: CategoryKind) {
     categoryId: input.categoryId,
     description: input.description.trim(),
     ...(customLabel ? { customCategory: customLabel } : {}),
+    ...(input.recurrence
+      ? { recurrenceId: input.recurrence.ruleId, occurrenceDate: input.recurrence.date }
+      : {}),
   };
+}
+
+/** Editar um lançamento gerado por recorrência mantém a ligação com a regra. */
+function recurrenceTagsOf(existing: Transaction) {
+  return existing.recurrenceId !== undefined && existing.occurrenceDate !== undefined
+    ? { recurrenceId: existing.recurrenceId, occurrenceDate: existing.occurrenceDate }
+    : {};
 }
 
 /** Conta precisa existir e, se arquivada, só vale quando já era a mesma do lançamento editado. */
@@ -214,6 +226,7 @@ export async function updateIncome(id: number, input: IncomeInput): Promise<void
 
   const record: IncomeTransaction = {
     ...common,
+    ...recurrenceTagsOf(existing),
     id,
     type: "entrada",
     accountId: input.accountId,
@@ -261,7 +274,7 @@ export async function updateExpense(id: number, input: ExpenseInput): Promise<vo
     const [only] = records;
 
     if (only !== undefined && records.length === 1 && members.length === 1) {
-      await transactionsRepository.update({ ...only, id });
+      await transactionsRepository.update({ ...only, ...recurrenceTagsOf(existing), id });
     } else {
       await transactionsRepository.applyChanges({ remove: idsOf(members), add: records });
     }

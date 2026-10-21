@@ -97,6 +97,8 @@ export function useInvestments() {
   return {
     // dados e derivados
     assets,
+    operations,
+    incomes,
     loaded,
     assetViews,
     summary,

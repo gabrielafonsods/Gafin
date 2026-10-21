@@ -3,16 +3,11 @@ import { computed, ref } from "vue";
 import CardDetail from "@/components/balance/CardDetail.vue";
 import CardForm from "@/components/balance/CardForm.vue";
 import SubNav from "@/components/layout/SubNav.vue";
+import { BALANCE_TABS } from "@/types/navigation";
 import { useBalance } from "@/composables/useBalance";
 import { formatCurrency } from "@/utils/currency";
 
-const tabs = [
-  { to: "/saldo", label: "Dashboard" },
-  { to: "/saldo/contas", label: "Contas" },
-  { to: "/saldo/cartoes", label: "Cartões" },
-  { to: "/saldo/entradas", label: "Entradas" },
-  { to: "/saldo/saidas", label: "Saídas" },
-];
+const tabs = BALANCE_TABS;
 
 const { cards, cardUsage } = useBalance();
 

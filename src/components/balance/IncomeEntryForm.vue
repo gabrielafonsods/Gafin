@@ -8,7 +8,7 @@ import type { IncomeTransaction } from "@/database/schema";
 const props = defineProps<{ transaction?: IncomeTransaction | null }>();
 const emit = defineEmits<{ saved: []; cancel: [] }>();
 
-const { accounts, incomeCategories, addIncome, editIncome } = useBalance();
+const { accounts, categories, addIncome, editIncome } = useBalance();
 
 // Contas arquivadas só aparecem se já eram a conta deste lançamento.
 const accountOptions = computed(() =>
@@ -25,7 +25,13 @@ const form = reactive({
 });
 const error = ref("");
 
-const selectedCategory = computed(() => incomeCategories.value.find((c) => c.id === form.categoryId));
+// Categorias arquivadas só aparecem se já eram a categoria deste lançamento.
+const categoryOptions = computed(() =>
+  categories.value.filter(
+    (c) => c.kind === "entrada" && (!c.archived || c.id === props.transaction?.categoryId),
+  ),
+);
+const selectedCategory = computed(() => categories.value.find((c) => c.id === form.categoryId));
 
 async function handleSubmit() {
   error.value = "";
@@ -65,7 +71,7 @@ async function handleSubmit() {
       Categoria
       <select v-model.number="form.categoryId" class="form-input" required>
         <option :value="null" disabled>Selecione</option>
-        <option v-for="c in incomeCategories" :key="c.id" :value="c.id">{{ c.name }}</option>
+        <option v-for="c in categoryOptions" :key="c.id" :value="c.id">{{ c.name }}</option>
       </select>
     </label>
     <label class="form-label">

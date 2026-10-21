@@ -30,6 +30,7 @@ const CHIP: Partial<Record<StatementEntry["kind"], string>> = {
         {{ SIGN[entry.direction] }}{{ formatCurrency(entry.amount) }}
       </span>
       <span v-if="CHIP[entry.kind]" class="chip">{{ CHIP[entry.kind] }}</span>
+      <span v-if="entry.recurring" class="chip">recorrente</span>
     </div>
     <div v-if="actions && entry.kind !== 'pagamento_fatura'" class="list-row__actions">
       <button type="button" class="link-action" @click="emit('edit', entry)">Editar</button>

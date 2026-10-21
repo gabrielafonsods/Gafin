@@ -4,6 +4,7 @@ import ExpenseEntryForm from "@/components/balance/ExpenseEntryForm.vue";
 import MonthNav from "@/components/balance/MonthNav.vue";
 import StatementRow from "@/components/balance/StatementRow.vue";
 import SubNav from "@/components/layout/SubNav.vue";
+import { BALANCE_TABS } from "@/types/navigation";
 import { useBalance } from "@/composables/useBalance";
 import { isCardExpense } from "@/services/balanceCalculator";
 import type { StatementEntry } from "@/services/balanceViews";
@@ -11,13 +12,7 @@ import { toUserMessage } from "@/services/errors";
 import { formatCurrency } from "@/utils/currency";
 import { monthKey, todayISO } from "@/utils/date";
 
-const tabs = [
-  { to: "/saldo", label: "Dashboard" },
-  { to: "/saldo/contas", label: "Contas" },
-  { to: "/saldo/cartoes", label: "Cartões" },
-  { to: "/saldo/entradas", label: "Entradas" },
-  { to: "/saldo/saidas", label: "Saídas" },
-];
+const tabs = BALANCE_TABS;
 
 const { transactions, activeAccounts, statementFor, summaryFor, removeTransaction } = useBalance();
 

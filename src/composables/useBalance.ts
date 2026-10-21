@@ -4,6 +4,7 @@ import {
   cardsRepository,
   categoriesRepository,
   invoicesRepository,
+  recurrencesRepository,
   transactionsRepository,
   transfersRepository,
 } from "@/database/repositories";
@@ -12,6 +13,7 @@ import type {
   Card,
   Category,
   Invoice,
+  Recurrence,
   Transaction,
   Transfer,
 } from "@/database/schema";
@@ -32,6 +34,7 @@ import {
 import {
   buildInvoiceViews,
   buildStatement,
+  getBudgetProgress,
   getCategoryBreakdown,
   getInvoiceItems,
   getUpcomingInvoices,
@@ -45,7 +48,25 @@ import {
   updateCard,
   type CardInput,
 } from "@/services/cardsService";
+import {
+  createCategory,
+  deleteCategory,
+  renameCategory,
+  setCategoryArchived,
+  setCategoryBudget,
+} from "@/services/categoriesService";
 import { DomainError } from "@/services/errors";
+import {
+  createRecurrence,
+  deleteRecurrence,
+  generateDueTransactions,
+  setRecurrenceActive,
+  updateRecurrence,
+  type RecurrenceInput,
+  type RecurrenceRunResult,
+} from "@/services/recurrencesService";
+import { monthlyEquivalent, nextOccurrence } from "@/services/recurrenceSchedule";
+import type { CategoryKind } from "@/database/schema";
 import { payInvoice, undoInvoicePayment } from "@/services/invoicesService";
 import {
   createExpense,
@@ -77,19 +98,23 @@ const categories = ref<Category[]>([]);
 const transactions = ref<Transaction[]>([]);
 const invoices = ref<Invoice[]>([]);
 const transfers = ref<Transfer[]>([]);
+const recurrences = ref<Recurrence[]>([]);
+/** Ocorrências que o gerador não conseguiu lançar (mostradas em Recorrentes até o usuário dispensar). */
+const recurrenceNotice = ref<RecurrenceRunResult["skipped"]>([]);
 const loaded = ref(false);
 const loading = ref(false);
 
 async function loadAll(): Promise<void> {
   loading.value = true;
   try {
-    const [a, c, cat, t, i, tr] = await Promise.all([
+    const [a, c, cat, t, i, tr, rec] = await Promise.all([
       accountsRepository.getAll(),
       cardsRepository.getAll(),
       categoriesRepository.getAll(),
       transactionsRepository.getAll(),
       invoicesRepository.getAll(),
       transfersRepository.getAll(),
+      recurrencesRepository.getAll(),
     ]);
     accounts.value = a;
     cards.value = c;
@@ -97,6 +122,7 @@ async function loadAll(): Promise<void> {
     transactions.value = t;
     invoices.value = i;
     transfers.value = tr;
+    recurrences.value = rec;
     loaded.value = true;
   } finally {
     loading.value = false;
@@ -143,8 +169,31 @@ const invoiceViews = computed(() =>
 /** Faturas a pagar (com compras), pelo vencimento mais próximo. */
 const upcomingInvoices = computed(() => getUpcomingInvoices(snapshot.value, todayISO()));
 
-const incomeCategories = computed(() => categories.value.filter((c) => c.kind === "entrada"));
-const expenseCategories = computed(() => categories.value.filter((c) => c.kind === "saida"));
+/** Categorias arquivadas ficam fora dos formulários (mas seguem no histórico). */
+const incomeCategories = computed(() =>
+  categories.value.filter((c) => c.kind === "entrada" && !c.archived),
+);
+const expenseCategories = computed(() =>
+  categories.value.filter((c) => c.kind === "saida" && !c.archived),
+);
+
+/** Cada recorrência com o nome do destino e a próxima data. */
+const recurrenceViews = computed(() =>
+  recurrences.value
+    .map((rule) => {
+      const targetName =
+        "cardId" in rule
+          ? (cards.value.find((c) => c.id === rule.cardId)?.name ?? "Cartão removido")
+          : (accounts.value.find((a) => a.id === rule.accountId)?.name ?? "Conta removida");
+      return {
+        rule,
+        targetName,
+        next: rule.active ? nextOccurrence(rule, rule.generatedThrough) : null,
+        perMonth: monthlyEquivalent(rule.frequency, rule.amount),
+      };
+    })
+    .sort((a, b) => (a.next ?? "9999").localeCompare(b.next ?? "9999")),
+);
 
 /** Resumo do mês corrente, usado pelo Dashboard do Início. */
 const summary = computed(() => getMonthlySummary(snapshot.value, monthKey(todayISO())));
@@ -155,6 +204,7 @@ const breakdownFor = (month: string, kind: "entrada" | "saida") =>
   getCategoryBreakdown(snapshot.value, categories.value, month, kind);
 const statementFor = (filter: StatementFilter = {}) =>
   buildStatement(snapshot.value, categories.value, filter);
+const budgetFor = (month: string) => getBudgetProgress(snapshot.value, categories.value, month);
 const invoiceItemsFor = (invoice: Invoice) =>
   getInvoiceItems(invoice, transactions.value, categories.value);
 
@@ -184,6 +234,37 @@ async function editAccount(id: number, input: AccountFormInput): Promise<void> {
   await mutate(() => updateAccount(id, { name: input.name, type: input.type, initialBalance }));
 }
 
+/** Lança as recorrências vencidas e recarrega. Seguro de rodar quantas vezes for preciso. */
+let recurrenceRun: Promise<RecurrenceRunResult> | null = null;
+
+async function runRecurrences(): Promise<RecurrenceRunResult> {
+  // Duas execuções simultâneas leriam o mesmo estado e lançariam em dobro: enfileira.
+  while (recurrenceRun) await recurrenceRun.catch(() => undefined);
+
+  recurrenceRun = (async () => {
+    const result = await generateDueTransactions();
+    if (result.skipped.length > 0) recurrenceNotice.value = result.skipped;
+    await loadAll();
+    return result;
+  })();
+  try {
+    return await recurrenceRun;
+  } finally {
+    recurrenceRun = null;
+  }
+}
+
+async function addRecurrence(input: RecurrenceInput): Promise<number> {
+  const id = await createRecurrence(input);
+  await runRecurrences(); // lança já as ocorrências atrasadas (se a data inicial é passada)
+  return id;
+}
+
+async function editRecurrence(id: number, input: RecurrenceInput): Promise<void> {
+  await updateRecurrence(id, input);
+  await runRecurrences();
+}
+
 export function useBalance() {
   if (!loaded.value && !loading.value) {
     void loadAll();
@@ -197,7 +278,10 @@ export function useBalance() {
     transactions,
     invoices,
     transfers,
+    recurrences,
+    recurrenceNotice,
     loaded,
+    snapshot,
     // derivados
     accountBalances,
     cardUsage,
@@ -212,6 +296,8 @@ export function useBalance() {
     breakdownFor,
     statementFor,
     invoiceItemsFor,
+    budgetFor,
+    recurrenceViews,
     // contas
     addAccount,
     editAccount,
@@ -230,6 +316,22 @@ export function useBalance() {
     addExpense: (input: ExpenseInput) => mutate(() => createExpense(input)),
     editExpense: (id: number, input: ExpenseInput) => mutate(() => updateExpense(id, input)),
     removeTransaction: (id: number) => mutate(() => deleteTransaction(id)),
+    // recorrências
+    addRecurrence,
+    editRecurrence,
+    toggleRecurrence: (id: number, active: boolean) => mutate(() => setRecurrenceActive(id, active)),
+    removeRecurrence: (id: number) => mutate(() => deleteRecurrence(id)),
+    runRecurrences,
+    dismissRecurrenceNotice: () => {
+      recurrenceNotice.value = [];
+    },
+    // categorias
+    addCategory: (input: { name: string; kind: CategoryKind }) => mutate(() => createCategory(input)),
+    renameCategory: (id: number, name: string) => mutate(() => renameCategory(id, name)),
+    setCategoryBudget: (id: number, amount: number | null) => mutate(() => setCategoryBudget(id, amount)),
+    setCategoryArchived: (id: number, archived: boolean) =>
+      mutate(() => setCategoryArchived(id, archived)),
+    removeCategory: (id: number) => mutate(() => deleteCategory(id)),
     // transferências entre contas
     addTransfer: (input: TransferInput) => mutate(() => createTransfer(input)),
     editTransfer: (id: number, input: TransferInput) => mutate(() => updateTransfer(id, input)),

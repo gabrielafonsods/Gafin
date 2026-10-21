@@ -85,3 +85,29 @@ export function shiftDateByMonths(date: string, delta: number): string {
   const { year, month, day } = parseISODate(date);
   return makeDate(shiftMonth({ year, month }, delta), day);
 }
+
+/** Soma (ou subtrai) dias a uma data "YYYY-MM-DD". */
+export function addDaysISO(date: string, days: number): string {
+  const { year, month, day } = parseISODate(date);
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
+  return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`;
+}
+
+/** Último dia do mês: "2026-02" -> "2026-02-28". */
+export function endOfMonth(key: string): string {
+  const [year, month] = key.split("-").map(Number);
+  return makeDate({ year: year ?? 0, month: month ?? 1 }, 31);
+}
+
+/** Os `count` meses que terminam em `endKey`, do mais antigo ao mais novo. */
+export function monthRange(endKey: string, count: number): string[] {
+  return Array.from({ length: count }, (_, i) => shiftMonthKey(endKey, i - (count - 1)));
+}
+
+/** "2026-09" -> "set" */
+export function formatMonthShort(key: string): string {
+  const [year, month] = key.split("-").map(Number);
+  return new Date(year ?? 0, (month ?? 1) - 1, 1)
+    .toLocaleDateString("pt-BR", { month: "short" })
+    .replace(".", "");
+}

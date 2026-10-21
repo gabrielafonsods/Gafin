@@ -8,10 +8,18 @@ import {
   investmentIncomesRepository,
   investmentOperationsRepository,
   invoicesRepository,
+  recurrencesRepository,
   transactionsRepository,
   transfersRepository,
 } from "@/database/repositories";
-import { DB_VERSION, STORES, type AppSettings, type Theme } from "@/database/schema";
+import {
+  DB_VERSION,
+  MIN_BACKUP_SCHEMA_VERSION,
+  STORES,
+  STORE_ADDED_IN,
+  type AppSettings,
+  type Theme,
+} from "@/database/schema";
 import { jsonFile, saveFile } from "@/utils/fileSaver";
 import { DomainError } from "./errors";
 
@@ -70,6 +78,7 @@ async function collectData(): Promise<Record<string, unknown[]>> {
     investments,
     investmentOperations,
     investmentIncomes,
+    recurrences,
     settings,
   ] = await Promise.all([
     accountsRepository.getAll(),
@@ -81,6 +90,7 @@ async function collectData(): Promise<Record<string, unknown[]>> {
     assetsRepository.getAll(),
     investmentOperationsRepository.getAll(),
     investmentIncomesRepository.getAll(),
+    recurrencesRepository.getAll(),
     getSettings(),
   ]);
 
@@ -96,6 +106,7 @@ async function collectData(): Promise<Record<string, unknown[]>> {
     investments,
     investmentOperations,
     investmentIncomes,
+    recurrences,
     settings: [sanitizeSettingsForBackup(settings)],
   };
 }
@@ -129,16 +140,26 @@ export function validateBackupPayload(payload: unknown): asserts payload is Back
   if (candidate.app !== APP_ID) {
     throw new DomainError("Este arquivo não é um backup do Gafin.");
   }
-  if (candidate.schemaVersion !== DB_VERSION) {
+  const version = candidate.schemaVersion;
+  if (typeof version !== "number" || !Number.isInteger(version)) {
+    throw new DomainError("Arquivo de backup inválido: versão ausente.");
+  }
+  if (version > DB_VERSION) {
     throw new DomainError(
-      `Este backup é de outra versão do Gafin (v${candidate.schemaVersion ?? "?"}; este app está na v${DB_VERSION}). Exporte um backup novo nesta versão antes de restaurar.`,
+      `Este backup foi feito numa versão mais nova do Gafin (v${version}; este app está na v${DB_VERSION}). Atualize o app antes de restaurar.`,
     );
+  }
+  if (version < MIN_BACKUP_SCHEMA_VERSION) {
+    throw new DomainError("Este backup é de uma versão antiga demais do Gafin para ser restaurado.");
   }
   if (typeof candidate.data !== "object" || candidate.data === null) {
     throw new DomainError("Arquivo de backup corrompido: dados ausentes.");
   }
   for (const storeName of Object.keys(STORES)) {
-    if (!isRecordArray((candidate.data as Record<string, unknown>)[storeName])) {
+    const value = (candidate.data as Record<string, unknown>)[storeName];
+    // Backup antigo não tem as stores criadas depois dele: ficam vazias na restauração.
+    if (value === undefined && (STORE_ADDED_IN[storeName] ?? 1) > version) continue;
+    if (!isRecordArray(value)) {
       throw new DomainError(`Arquivo de backup corrompido: dados de "${storeName}" ausentes ou inválidos.`);
     }
   }

@@ -12,7 +12,7 @@ import type { ExpenseTransaction, PaymentMethod } from "@/database/schema";
 const props = defineProps<{ transaction?: ExpenseTransaction | null }>();
 const emit = defineEmits<{ saved: []; cancel: [] }>();
 
-const { accounts, cards, transactions, expenseCategories, addExpense, editExpense } = useBalance();
+const { accounts, cards, categories, transactions, addExpense, editExpense } = useBalance();
 
 const editing = props.transaction ?? null;
 const editingCard = editing && isCardExpense(editing) ? editing : null;
@@ -50,7 +50,11 @@ const cardOptions = computed(() =>
   cards.value.filter((c) => !c.archived || c.id === editingCard?.cardId),
 );
 
-const selectedCategory = computed(() => expenseCategories.value.find((c) => c.id === form.categoryId));
+// Categorias arquivadas só aparecem se já eram a categoria deste lançamento.
+const categoryOptions = computed(() =>
+  categories.value.filter((c) => c.kind === "saida" && (!c.archived || c.id === editing?.categoryId)),
+);
+const selectedCategory = computed(() => categories.value.find((c) => c.id === form.categoryId));
 const isCard = computed(() => form.paymentMethod === "cartao");
 const installmentCount = computed(() => Math.max(1, Math.floor(Number(form.installments) || 1)));
 
@@ -117,7 +121,7 @@ async function handleSubmit() {
       Categoria
       <select v-model.number="form.categoryId" class="form-input" required>
         <option :value="null" disabled>Selecione</option>
-        <option v-for="c in expenseCategories" :key="c.id" :value="c.id">{{ c.name }}</option>
+        <option v-for="c in categoryOptions" :key="c.id" :value="c.id">{{ c.name }}</option>
       </select>
     </label>
     <label class="form-label">

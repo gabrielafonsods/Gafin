@@ -4,38 +4,49 @@ import { useInvestments } from "@/composables/useInvestments";
 import { toUserMessage } from "@/services/errors";
 import { OPERATION_TYPES, OPERATION_TYPE_LABELS } from "@/types/investments";
 import { todayISO } from "@/utils/date";
-import type { OperationType } from "@/database/schema";
+import type { InvestmentOperation, OperationType } from "@/database/schema";
 
-const props = defineProps<{ assetId: number }>();
-const { addOperation } = useInvestments();
+const props = defineProps<{ assetId: number; operation?: InvestmentOperation | null }>();
+const emit = defineEmits<{ saved: []; cancel: [] }>();
+
+const { addOperation, editOperation } = useInvestments();
+const editing = props.operation ?? null;
 
 const form = reactive({
-  type: "compra" as OperationType,
-  quantity: "",
-  price: "",
-  fees: "",
-  date: todayISO(),
-  note: "",
+  type: (editing?.type ?? "compra") as OperationType,
+  quantity: editing ? String(editing.quantity) : "",
+  price: editing ? String(editing.price) : "",
+  fees: editing && editing.fees > 0 ? String(editing.fees) : "",
+  date: editing?.date ?? todayISO(),
+  note: editing?.note ?? "",
 });
 const error = ref("");
 
 async function handleSubmit() {
   error.value = "";
+  const input = {
+    assetId: props.assetId,
+    type: form.type,
+    quantity: Number(form.quantity),
+    price: Number(form.price),
+    fees: form.fees.trim() === "" ? 0 : Number(form.fees),
+    date: form.date,
+    note: form.note,
+  };
   try {
-    await addOperation({
-      assetId: props.assetId,
-      type: form.type,
-      quantity: Number(form.quantity),
-      price: Number(form.price),
-      fees: form.fees.trim() === "" ? 0 : Number(form.fees),
-      date: form.date,
-      note: form.note,
-    });
-    form.quantity = "";
-    form.price = "";
-    form.fees = "";
-    form.note = "";
+    if (editing?.id !== undefined) {
+      await editOperation(editing.id, input);
+    } else {
+      await addOperation(input);
+      // Novo registro: limpa os campos para lançar outra operação em seguida.
+      form.quantity = "";
+      form.price = "";
+      form.fees = "";
+      form.note = "";
+    }
+    emit("saved");
   } catch (e) {
+    // Ex.: a alteração deixaria uma venda maior que a posição — o histórico não é tocado.
     error.value = toUserMessage(e);
   }
 }
@@ -73,7 +84,8 @@ async function handleSubmit() {
     <p v-if="error" class="form-error">{{ error }}</p>
 
     <div class="form-actions">
-      <button type="submit" class="btn-primary">Registrar operação</button>
+      <button type="submit" class="btn-primary">{{ editing ? "Salvar alterações" : "Registrar operação" }}</button>
+      <button v-if="editing" type="button" class="btn-secondary" @click="emit('cancel')">Cancelar</button>
     </div>
   </form>
 </template>

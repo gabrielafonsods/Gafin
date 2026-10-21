@@ -14,8 +14,29 @@ export const DB_NAME = "gafin-db";
 // v1: accounts | v2: + investments | v3: + cards, categories, transactions,
 // invoices, transfers | v4: investments passa a ser a store de ativos
 // (migrada) + investmentOperations e investmentIncomes | v5: + settings
-// (aparência e bloqueio do app)
-export const DB_VERSION = 5;
+// (aparência e bloqueio do app) | v6: + recurrences (lançamentos recorrentes)
+export const DB_VERSION = 6;
+
+/** Backups mais antigos que isso nunca existiram (o recurso nasceu na v5). */
+export const MIN_BACKUP_SCHEMA_VERSION = 5;
+
+/**
+ * Versão do schema em que cada store passou a existir. Um backup antigo não
+ * tem as stores criadas depois dele — nesse caso elas são restauradas vazias.
+ */
+export const STORE_ADDED_IN: Record<string, number> = {
+  accounts: 1,
+  investments: 2,
+  cards: 3,
+  categories: 3,
+  transactions: 3,
+  invoices: 3,
+  transfers: 3,
+  investmentOperations: 4,
+  investmentIncomes: 4,
+  settings: 5,
+  recurrences: 6,
+};
 
 export interface StoreDefinition {
   name: string;
@@ -114,6 +135,11 @@ export const STORES: Record<string, StoreDefinition> = {
     name: "settings",
     keyPath: "id",
   },
+  recurrences: {
+    name: "recurrences",
+    keyPath: "id",
+    autoIncrement: true,
+  },
 };
 
 export type StoreName = keyof typeof STORES;
@@ -156,6 +182,12 @@ export interface Category {
   kind: CategoryKind;
   /** "Outros": a UI deve pedir/incentivar uma descrição personalizada. */
   acceptsCustomLabel: boolean;
+  /** Criada pelo usuário (as padrão não têm este campo). */
+  custom?: boolean;
+  /** Arquivada: some dos formulários, mas continua no histórico. */
+  archived?: boolean;
+  /** Orçamento mensal (só categorias de saída). */
+  monthlyBudget?: number;
 }
 
 export type PaymentMethod = "dinheiro" | "pix" | "cartao";
@@ -168,6 +200,9 @@ interface TransactionBase {
   description: string;
   /** Só preenchido em categorias "Outros". */
   customCategory?: string;
+  /** Lançamento gerado por uma recorrência (regra + data da ocorrência). */
+  recurrenceId?: number;
+  occurrenceDate?: string;
   createdAt: string;
 }
 
@@ -314,3 +349,43 @@ export interface AppSettings {
   theme: Theme;
   security: SecuritySettings;
 }
+
+// --- Recorrências ----------------------------------------------------------
+
+export type RecurrenceFrequency = "semanal" | "mensal" | "anual";
+
+interface RecurrenceBase {
+  id?: number;
+  /** Valor de cada ocorrência. */
+  amount: number;
+  categoryId: number;
+  description: string;
+  customCategory?: string;
+  frequency: RecurrenceFrequency;
+  /** Primeira ocorrência (ancora o dia do mês / da semana). */
+  startDate: string;
+  endDate?: string;
+  active: boolean;
+  /** Última ocorrência já lançada: o gerador só olha para depois dela. */
+  generatedThrough?: string;
+  createdAt: string;
+}
+
+export interface IncomeRecurrence extends RecurrenceBase {
+  kind: "entrada";
+  accountId: number;
+}
+
+export interface AccountExpenseRecurrence extends RecurrenceBase {
+  kind: "saida";
+  paymentMethod: "dinheiro" | "pix";
+  accountId: number;
+}
+
+export interface CardExpenseRecurrence extends RecurrenceBase {
+  kind: "saida";
+  paymentMethod: "cartao";
+  cardId: number;
+}
+
+export type Recurrence = IncomeRecurrence | AccountExpenseRecurrence | CardExpenseRecurrence;

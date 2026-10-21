@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import IncomeForm from "@/components/investments/IncomeForm.vue";
 import OperationForm from "@/components/investments/OperationForm.vue";
 import { useInvestments } from "@/composables/useInvestments";
@@ -29,6 +29,30 @@ const {
 const view = computed(() => assetViews.value.find((item) => item.asset.id === props.assetId));
 const operations = computed(() => operationsOf(props.assetId));
 const incomes = computed(() => incomesOf(props.assetId));
+
+// Edição inline: o formulário de cima troca para o registro escolhido na lista.
+const editingOperationId = ref<number | null>(null);
+const editingIncomeId = ref<number | null>(null);
+const editingOperation = computed(
+  () => operations.value.find((operation) => operation.id === editingOperationId.value) ?? null,
+);
+const editingIncome = computed(() => incomes.value.find((income) => income.id === editingIncomeId.value) ?? null);
+const operationFormEl = ref<HTMLElement | null>(null);
+const incomeFormEl = ref<HTMLElement | null>(null);
+
+async function startEditOperation(id?: number) {
+  if (id === undefined) return;
+  editingOperationId.value = id;
+  await nextTick();
+  operationFormEl.value?.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+async function startEditIncome(id?: number) {
+  if (id === undefined) return;
+  editingIncomeId.value = id;
+  await nextTick();
+  incomeFormEl.value?.scrollIntoView({ behavior: "smooth", block: "center" });
+}
 
 const priceInput = ref("");
 const valueInput = ref("");
@@ -152,7 +176,18 @@ const handleRemoveIncome = (id?: number) => id !== undefined && run(() => remove
 
     <section class="block">
       <h3 class="block__title">Operações</h3>
-      <OperationForm :asset-id="assetId" />
+      <div ref="operationFormEl">
+        <p v-if="editingOperation" class="block__hint">
+          Editando a operação de {{ formatDateBR(editingOperation.date) }}
+        </p>
+        <OperationForm
+          :key="editingOperationId ?? 'nova'"
+          :asset-id="assetId"
+          :operation="editingOperation"
+          @saved="editingOperationId = null"
+          @cancel="editingOperationId = null"
+        />
+      </div>
       <p v-if="operations.length === 0" class="block__hint">Nenhuma operação registrada.</p>
       <ul v-else class="history">
         <li v-for="operation in operations" :key="operation.id" class="history__item">
@@ -164,14 +199,28 @@ const handleRemoveIncome = (id?: number) => id !== undefined && run(() => remove
               {{ formatDateBR(operation.date) }}<template v-if="operation.fees > 0"> · taxas {{ formatCurrency(operation.fees) }}</template><template v-if="operation.note"> · {{ operation.note }}</template>
             </span>
           </div>
-          <button type="button" class="link-action link-action--danger" @click="handleRemoveOperation(operation.id)">Excluir</button>
+          <div class="history__actions">
+            <button type="button" class="link-action" @click="startEditOperation(operation.id)">Editar</button>
+            <button type="button" class="link-action link-action--danger" @click="handleRemoveOperation(operation.id)">Excluir</button>
+          </div>
         </li>
       </ul>
     </section>
 
     <section class="block">
       <h3 class="block__title">Rendimentos</h3>
-      <IncomeForm :asset-id="assetId" />
+      <div ref="incomeFormEl">
+        <p v-if="editingIncome" class="block__hint">
+          Editando o rendimento de {{ formatDateBR(editingIncome.date) }}
+        </p>
+        <IncomeForm
+          :key="editingIncomeId ?? 'novo'"
+          :asset-id="assetId"
+          :income="editingIncome"
+          @saved="editingIncomeId = null"
+          @cancel="editingIncomeId = null"
+        />
+      </div>
       <p v-if="incomes.length === 0" class="block__hint">Nenhum rendimento registrado.</p>
       <ul v-else class="history">
         <li v-for="income in incomes" :key="income.id" class="history__item">
@@ -181,7 +230,10 @@ const handleRemoveIncome = (id?: number) => id !== undefined && run(() => remove
               {{ formatDateBR(income.date) }}<template v-if="income.description"> · {{ income.description }}</template>
             </span>
           </div>
-          <button type="button" class="link-action link-action--danger" @click="handleRemoveIncome(income.id)">Excluir</button>
+          <div class="history__actions">
+            <button type="button" class="link-action" @click="startEditIncome(income.id)">Editar</button>
+            <button type="button" class="link-action link-action--danger" @click="handleRemoveIncome(income.id)">Excluir</button>
+          </div>
         </li>
       </ul>
     </section>
@@ -308,6 +360,13 @@ const handleRemoveIncome = (id?: number) => id !== undefined && run(() => remove
 .history__title {
   font-size: 13px;
   font-weight: 600;
+}
+
+.history__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
 }
 
 .history__detail {

@@ -43,6 +43,16 @@ export const router = createRouter({
           name: "saldo-saidas",
           component: () => import("@/views/balance/ExpensesView.vue"),
         },
+        {
+          path: "recorrentes",
+          name: "saldo-recorrentes",
+          component: () => import("@/views/balance/RecurrencesView.vue"),
+        },
+        {
+          path: "categorias",
+          name: "saldo-categorias",
+          component: () => import("@/views/balance/CategoriesView.vue"),
+        },
       ],
     },
     {
