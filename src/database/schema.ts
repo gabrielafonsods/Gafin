@@ -274,6 +274,7 @@ export type AssetType =
   | "acoes"
   | "fiis"
   | "etfs"
+  | "tesouro_direto"
   | "criptomoedas"
   | "exterior"
   | "outros";
@@ -289,8 +290,12 @@ export interface Asset {
   ticker: string;
   type: AssetType;
   institution: string;
-  /** Cotação atual por unidade, informada manualmente. */
+  /** Cotação atual por unidade (informada à mão ou atualizada automaticamente). */
   currentPrice?: number;
+  /** Quando a cotação foi atualizada pela última vez (ISO). */
+  priceUpdatedAt?: string;
+  /** false = nunca atualizar sozinho (preço só manual). Ausente = automático, se o tipo permitir. */
+  autoQuote?: boolean;
   createdAt: string;
 }
 
@@ -343,11 +348,25 @@ export interface SecuritySettings {
   biometricCredentialId?: string;
 }
 
+/**
+ * Cotações automáticas (brapi.dev). O token é pessoal e fica só neste
+ * aparelho: não entra no backup nem nas exportações.
+ */
+export interface QuoteSettings {
+  token?: string;
+  autoRefresh: boolean;
+  /** Última rodada de atualização (ISO). */
+  lastRunAt?: string;
+}
+
 /** Registro único, sempre com id "main". */
 export interface AppSettings {
   id: "main";
   theme: Theme;
   security: SecuritySettings;
+  quotes?: QuoteSettings;
+  /** % ideal da carteira por tipo de ativo (0–100; a soma não passa de 100). */
+  allocationTargets?: Partial<Record<AssetType, number>>;
 }
 
 // --- Recorrências ----------------------------------------------------------

@@ -47,7 +47,18 @@ function sanitizeSettingsForBackup(settings: AppSettings): AppSettings {
       inactivityTimeoutMinutes: settings.security.inactivityTimeoutMinutes,
       biometricEnabled: false,
     },
+    // As metas de alocação são dado do usuário e vão no backup; o token de
+    // cotações (settings.quotes) é credencial e fica de fora, como o PIN.
+    ...(settings.allocationTargets ? { allocationTargets: settings.allocationTargets } : {}),
   };
+}
+
+function validTargets(value: unknown): AppSettings["allocationTargets"] | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const entries = Object.entries(value as Record<string, unknown>).filter(
+    ([, percent]) => typeof percent === "number" && Number.isFinite(percent) && percent > 0 && percent <= 100,
+  );
+  return entries.length > 0 ? (Object.fromEntries(entries) as AppSettings["allocationTargets"]) : undefined;
 }
 
 const THEMES: readonly Theme[] = ["light", "dark", "system"];
@@ -64,7 +75,16 @@ async function mergeSettingsForRestore(payload: BackupPayload): Promise<AppSetti
       ? timeout
       : current.security.inactivityTimeoutMinutes;
 
-  return { id: "main", theme, security: { ...current.security, inactivityTimeoutMinutes } };
+  const allocationTargets = validTargets(imported?.allocationTargets) ?? current.allocationTargets;
+
+  return {
+    id: "main",
+    theme,
+    security: { ...current.security, inactivityTimeoutMinutes },
+    // Token de cotações é do aparelho: nunca vem do arquivo, e o atual é mantido.
+    ...(current.quotes ? { quotes: current.quotes } : {}),
+    ...(allocationTargets ? { allocationTargets } : {}),
+  };
 }
 
 async function collectData(): Promise<Record<string, unknown[]>> {

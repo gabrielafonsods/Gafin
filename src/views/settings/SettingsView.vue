@@ -3,6 +3,7 @@ import BackupSection from "@/components/settings/BackupSection.vue";
 import ExportSection from "@/components/settings/ExportSection.vue";
 import SecuritySection from "@/components/settings/SecuritySection.vue";
 import AppearanceSection from "@/components/settings/AppearanceSection.vue";
+import QuotesSection from "@/components/settings/QuotesSection.vue";
 import AboutSection from "@/components/settings/AboutSection.vue";
 </script>
 
@@ -11,6 +12,7 @@ import AboutSection from "@/components/settings/AboutSection.vue";
     <h1 class="section__title">Configurações</h1>
     <BackupSection />
     <ExportSection />
+    <QuotesSection />
     <SecuritySection />
     <AppearanceSection />
     <AboutSection />

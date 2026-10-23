@@ -3,6 +3,11 @@ import { getSettings } from "@/database/repositories";
 import type { AppSettings } from "@/database/schema";
 import { applyTheme, setTheme } from "@/services/appearanceService";
 import {
+  saveQuoteSettings,
+  setAllocationTargets,
+  type QuoteSettingsPatch,
+} from "@/services/investmentSettingsService";
+import {
   disableBiometric,
   disableLock,
   enableBiometric,
@@ -50,6 +55,9 @@ const security = computed(
   () => settings.value?.security ?? { enabled: false, inactivityTimeoutMinutes: 5, biometricEnabled: false },
 );
 
+const quotes = computed(() => settings.value?.quotes ?? { autoRefresh: true });
+const allocationTargets = computed(() => settings.value?.allocationTargets ?? {});
+
 export function useSettings() {
   if (!loaded.value && !loading.value) {
     void loadAll();
@@ -60,7 +68,12 @@ export function useSettings() {
     loaded,
     theme,
     security,
+    quotes,
+    allocationTargets,
     biometricAvailable,
+    saveQuoteSettings: (patch: QuoteSettingsPatch) => mutate(() => saveQuoteSettings(patch)),
+    setAllocationTargets: (targets: AppSettings["allocationTargets"] & object) =>
+      mutate(() => setAllocationTargets(targets)),
     setTheme: (value: AppSettings["theme"]) => mutate(() => setTheme(value)),
     setupPin: (pin: string) => mutate(() => setupPin(pin)),
     disableLock: () => mutate(() => disableLock()),

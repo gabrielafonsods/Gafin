@@ -61,18 +61,31 @@ export const router = createRouter({
         {
           path: "",
           name: "investimentos",
-          component: () => import("@/views/investments/InvestmentsDashboard.vue"),
+          component: () => import("@/views/investments/InvestmentsSummaryView.vue"),
         },
         {
-          path: "carteira",
-          name: "investimentos-carteira",
-          component: () => import("@/views/investments/PortfolioView.vue"),
+          path: "posicoes",
+          name: "investimentos-posicoes",
+          component: () => import("@/views/investments/PositionsView.vue"),
         },
         {
-          path: "ativos",
-          name: "investimentos-ativos",
-          component: () => import("@/views/investments/AssetsView.vue"),
+          path: "proventos",
+          name: "investimentos-proventos",
+          component: () => import("@/views/investments/IncomesView.vue"),
         },
+        {
+          path: "patrimonio",
+          name: "investimentos-patrimonio",
+          component: () => import("@/views/investments/WealthView.vue"),
+        },
+        {
+          path: "rentabilidade",
+          name: "investimentos-rentabilidade",
+          component: () => import("@/views/investments/ReturnsView.vue"),
+        },
+        // Endereços antigos (Carteira e Ativos viraram "Posições").
+        { path: "carteira", redirect: "/investimentos/posicoes" },
+        { path: "ativos", redirect: "/investimentos/posicoes" },
       ],
     },
     {

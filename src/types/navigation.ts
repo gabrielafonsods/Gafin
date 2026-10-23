@@ -8,3 +8,12 @@ export const BALANCE_TABS = [
   { to: "/saldo/recorrentes", label: "Recorrentes" },
   { to: "/saldo/categorias", label: "Categorias" },
 ];
+
+/** Abas do módulo Investimentos. */
+export const INVESTMENT_TABS = [
+  { to: "/investimentos", label: "Resumo" },
+  { to: "/investimentos/posicoes", label: "Posições" },
+  { to: "/investimentos/proventos", label: "Proventos" },
+  { to: "/investimentos/patrimonio", label: "Patrimônio" },
+  { to: "/investimentos/rentabilidade", label: "Rentabilidade" },
+];

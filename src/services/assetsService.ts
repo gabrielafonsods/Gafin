@@ -17,6 +17,8 @@ export interface AssetInput {
   institution?: string;
   /** Cotação atual por unidade; vazio/undefined = não informada. */
   currentPrice?: number | null;
+  /** false = o preço só muda à mão (a atualização automática pula este ativo). */
+  autoQuote?: boolean;
 }
 
 function normalize(input: AssetInput) {
@@ -29,11 +31,18 @@ function normalize(input: AssetInput) {
     type: input.type,
     institution: (input.institution ?? "").trim(),
     ...(hasPrice ? { currentPrice: requirePrice(input.currentPrice as number, "Preço atual") } : {}),
+    ...(input.autoQuote === false ? { autoQuote: false } : {}),
   };
 }
 
 export async function createAsset(input: AssetInput): Promise<number> {
-  const asset: Asset = { ...normalize(input), createdAt: new Date().toISOString() };
+  const now = new Date().toISOString();
+  const data = normalize(input);
+  const asset: Asset = {
+    ...data,
+    ...(data.currentPrice !== undefined ? { priceUpdatedAt: now } : {}),
+    createdAt: now,
+  };
   return assetsRepository.create(asset);
 }
 
@@ -44,9 +53,13 @@ export async function updateAsset(id: number, input: AssetInput): Promise<void> 
   // Editar o cadastro não mexe na cotação se o formulário não a enviar.
   const data = normalize(input);
   const currentPrice = input.currentPrice === undefined ? existing.currentPrice : data.currentPrice;
+  // Só renova a data da cotação quando o preço realmente mudou no formulário.
+  const priceUpdatedAt =
+    currentPrice !== existing.currentPrice ? new Date().toISOString() : existing.priceUpdatedAt;
   await assetsRepository.update({
     ...data,
     ...(currentPrice !== undefined ? { currentPrice } : {}),
+    ...(currentPrice !== undefined && priceUpdatedAt ? { priceUpdatedAt } : {}),
     id,
     createdAt: existing.createdAt,
   });
@@ -57,9 +70,11 @@ export async function setCurrentPrice(id: number, price: number | null): Promise
   const existing = await assetsRepository.getById(id);
   if (!existing) throw new DomainError("Ativo não encontrado.");
 
-  const { currentPrice: _previous, ...rest } = existing;
+  const { currentPrice: _previous, priceUpdatedAt: _previousDate, ...rest } = existing;
   await assetsRepository.update(
-    price === null ? rest : { ...rest, currentPrice: requirePrice(price, "Preço atual") },
+    price === null
+      ? rest
+      : { ...rest, currentPrice: requirePrice(price, "Preço atual"), priceUpdatedAt: new Date().toISOString() },
   );
 }
 

@@ -48,3 +48,10 @@ const compactFormatter = new Intl.NumberFormat("pt-BR", {
 export function formatCompactCurrency(value: number): string {
   return compactFormatter.format(value);
 }
+
+/** "+16,14%" / "-4,48%" — com sinal explícito, para variações. */
+export function formatSignedPercent(value: number): string {
+  const text = percentFormatter.format(Math.abs(value));
+  if (Math.round(Math.abs(value) * 100) === 0) return `${text}%`;
+  return `${value > 0 ? "+" : "-"}${text}%`;
+}

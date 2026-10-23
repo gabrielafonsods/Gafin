@@ -4,6 +4,7 @@ import { router } from "./router";
 import { initDatabase } from "./database/db";
 import { initAppLock } from "./composables/useAppLock";
 import { useBalance } from "./composables/useBalance";
+import { useQuotes } from "./composables/useQuotes";
 import "./pwaUpdate"; // registra o Service Worker (ver pwaUpdate.ts)
 import "./assets/base.css";
 
@@ -18,6 +19,8 @@ initDatabase()
   })
   .finally(() => {
     createApp(App).use(router).mount("#app");
+    // Depois de mostrar a tela: a rede nunca atrasa a abertura do app.
+    void useQuotes().refreshIfDue();
   });
 
 // O app no iPhone raramente é "aberto de novo": ele volta do segundo plano.
@@ -27,5 +30,6 @@ document.addEventListener("visibilitychange", () => {
     useBalance()
       .runRecurrences()
       .catch((error) => console.error("Falha ao lançar recorrências:", error));
+    void useQuotes().refreshIfDue();
   }
 });

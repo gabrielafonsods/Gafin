@@ -29,8 +29,11 @@ import {
   allocationByAsset,
   allocationByType,
   buildAssetViews,
+  buildCategoryGroups,
   summarizePortfolio,
+  sumIncomesSince,
 } from "@/services/portfolioCalculator";
+import { shiftDateByMonths, todayISO } from "@/utils/date";
 
 /*
  * Estado compartilhado do módulo Investimentos (refs em nível de módulo, sem
@@ -73,6 +76,24 @@ const summary = computed(() => summarizePortfolio(assetViews.value));
 const typeAllocation = computed(() => allocationByType(assetViews.value));
 const assetAllocation = computed(() => allocationByAsset(assetViews.value));
 
+/** Ativos agrupados por categoria (tela Posições). */
+const categoryGroups = computed(() => buildCategoryGroups(assetViews.value));
+
+/** Proventos recebidos nos últimos 12 meses. */
+const incomesLast12Months = computed(() =>
+  sumIncomesSince(incomes.value, shiftDateByMonths(todayISO(), -12)),
+);
+
+/** Quando alguma cotação foi atualizada pela última vez (ISO), ou null. */
+const lastPriceUpdate = computed(
+  () =>
+    assets.value
+      .map((asset) => asset.priceUpdatedAt)
+      .filter((date): date is string => date !== undefined)
+      .sort()
+      .pop() ?? null,
+);
+
 /** Patrimônio investido (custo das posições em aberto) — usado pelo Início. */
 const totalInvested = computed(() => summary.value.patrimonioInvestido);
 
@@ -104,6 +125,9 @@ export function useInvestments() {
     summary,
     typeAllocation,
     assetAllocation,
+    categoryGroups,
+    incomesLast12Months,
+    lastPriceUpdate,
     totalInvested,
     operationsOf,
     incomesOf,

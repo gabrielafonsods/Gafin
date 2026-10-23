@@ -1,5 +1,5 @@
 import { roundMoney, roundPrice, roundQuantity } from "@/utils/currency";
-import { ASSET_TYPES } from "@/types/investments";
+import { ASSET_TYPES, EXTRA_POSITION_TYPES, MAIN_POSITION_TYPES } from "@/types/investments";
 import type {
   Asset,
   AssetType,
@@ -125,6 +125,18 @@ export interface AssetView {
   profit: number;
   /** Rentabilidade da posição em aberto, em % (sem contar rendimentos). */
   profitPercent: number;
+  /**
+   * Variação: quanto o preço atual está acima/abaixo do preço médio, em %.
+   * (Mesmo valor de profitPercent, com o nome usado nas telas.)
+   */
+  variationPercent: number;
+  /** Retorno total em R$: valor atual + vendas + proventos − tudo que foi comprado. */
+  totalReturn: number;
+  /**
+   * Rentabilidade: retorno total sobre o que foi comprado, em %. Diferente da
+   * variação, conta proventos recebidos e lucro de vendas já feitas.
+   */
+  returnPercent: number;
   incomesReceived: number;
   /** Participação no valor atual da carteira, em %. */
   sharePercent: number;
@@ -141,6 +153,7 @@ export function buildAssetViews(
     const currentPrice = asset.currentPrice ?? position.averagePrice;
     const currentValue = position.quantity > 0 ? roundMoney(position.quantity * currentPrice) : 0;
     const profit = roundMoney(currentValue - position.investedValue);
+    const variation = position.investedValue > 0 ? (profit / position.investedValue) * 100 : 0;
 
     return {
       asset,
@@ -149,7 +162,10 @@ export function buildAssetViews(
       currentPrice,
       currentValue,
       profit,
-      profitPercent: position.investedValue > 0 ? (profit / position.investedValue) * 100 : 0,
+      profitPercent: variation,
+      variationPercent: variation,
+      totalReturn: 0,
+      returnPercent: 0,
       incomesReceived: sumMoney(
         incomes.filter((income) => income.assetId === asset.id).map((income) => income.amount),
       ),
@@ -160,8 +176,25 @@ export function buildAssetViews(
   const totalValue = sumMoney(views.map((view) => view.currentValue));
   for (const view of views) {
     view.sharePercent = totalValue > 0 ? (view.currentValue / totalValue) * 100 : 0;
+    const { totalReturn, returnPercent } = calculateReturn([view]);
+    view.totalReturn = totalReturn;
+    view.returnPercent = returnPercent;
   }
   return views;
+}
+
+/**
+ * Retorno total de um conjunto de ativos: o que vale hoje, mais o que já foi
+ * recebido em vendas e proventos, menos tudo que foi comprado (com taxas).
+ * É um retorno simples sobre o capital aportado — não ponderado pelo tempo.
+ */
+export function calculateReturn(views: readonly AssetView[]): { totalReturn: number; returnPercent: number } {
+  const bought = sumMoney(views.map((v) => v.position.totalBought));
+  const sold = sumMoney(views.map((v) => v.position.totalSold));
+  const incomes = sumMoney(views.map((v) => v.incomesReceived));
+  const value = sumMoney(views.map((v) => v.currentValue));
+  const totalReturn = roundMoney(value + sold + incomes - bought);
+  return { totalReturn, returnPercent: bought > 0 ? (totalReturn / bought) * 100 : 0 };
 }
 
 export interface PortfolioSummary {
@@ -170,7 +203,13 @@ export interface PortfolioSummary {
   valorAtual: number;
   /** Lucro/prejuízo das posições em aberto (valor atual − investido). */
   lucroPrejuizo: number;
+  /** Mesmo valor de variacaoPercent (nome antigo, mantido por compatibilidade). */
   rentabilidadePercent: number;
+  /** Variação do preço atual contra o preço médio das posições em aberto. */
+  variacaoPercent: number;
+  /** Retorno total (valor atual + vendas + proventos − compras) e sua % sobre o comprado. */
+  retornoTotal: number;
+  retornoTotalPercent: number;
   /** Total de rendimentos recebidos (separado de compras e da rentabilidade). */
   rendimentosRecebidos: number;
   /** Lucro já realizado em vendas/resgates. */
@@ -186,12 +225,17 @@ export function summarizePortfolio(views: readonly AssetView[]): PortfolioSummar
   const valorAtual = sumMoney(open.map((view) => view.currentValue));
   const lucroPrejuizo = roundMoney(valorAtual - patrimonioInvestido);
   const biggest = [...open].sort((a, b) => b.currentValue - a.currentValue)[0] ?? null;
+  const variacao = patrimonioInvestido > 0 ? (lucroPrejuizo / patrimonioInvestido) * 100 : 0;
+  const totalReturn = calculateReturn(views);
 
   return {
     patrimonioInvestido,
     valorAtual,
     lucroPrejuizo,
-    rentabilidadePercent: patrimonioInvestido > 0 ? (lucroPrejuizo / patrimonioInvestido) * 100 : 0,
+    rentabilidadePercent: variacao,
+    variacaoPercent: variacao,
+    retornoTotal: totalReturn.totalReturn,
+    retornoTotalPercent: totalReturn.returnPercent,
     rendimentosRecebidos: sumMoney(views.map((view) => view.incomesReceived)),
     lucroRealizado: sumMoney(views.map((view) => view.position.realizedProfit)),
     quantidadeAtivos: open.length,
@@ -223,4 +267,56 @@ export function allocationByAsset(views: readonly AssetView[]): AssetView[] {
   return views
     .filter((view) => view.position.quantity > 0)
     .sort((a, b) => b.currentValue - a.currentValue);
+}
+
+export interface CategoryGroup {
+  type: AssetType;
+  /** Ativos com posição em aberto. */
+  count: number;
+  /** Todos os ativos da categoria: em aberto primeiro (maior valor antes), encerrados depois. */
+  views: AssetView[];
+  /** Valor atual e custo das posições em aberto. */
+  value: number;
+  invested: number;
+  variationPercent: number;
+  returnPercent: number;
+  /** Participação no valor atual da carteira, em %. */
+  sharePercent: number;
+}
+
+/**
+ * Agrupa os ativos por categoria para a tela Posições. As cinco categorias
+ * principais aparecem sempre (mesmo vazias); Criptomoedas, Exterior e Outros
+ * só quando têm ativos — assim nada cadastrado fica escondido.
+ */
+export function buildCategoryGroups(views: readonly AssetView[]): CategoryGroup[] {
+  const totalValue = sumMoney(views.map((v) => v.currentValue));
+  const types = [
+    ...MAIN_POSITION_TYPES,
+    ...EXTRA_POSITION_TYPES.filter((type) => views.some((v) => v.asset.type === type)),
+  ];
+
+  return types.map((type) => {
+    const members = views.filter((v) => v.asset.type === type);
+    const open = members.filter((v) => v.position.quantity > 0);
+    const closed = members.filter((v) => v.position.quantity === 0);
+    const value = sumMoney(open.map((v) => v.currentValue));
+    const invested = sumMoney(open.map((v) => v.position.investedValue));
+
+    return {
+      type,
+      count: open.length,
+      views: [...open.sort((a, b) => b.currentValue - a.currentValue), ...closed],
+      value,
+      invested,
+      variationPercent: invested > 0 ? ((value - invested) / invested) * 100 : 0,
+      returnPercent: calculateReturn(members).returnPercent,
+      sharePercent: totalValue > 0 ? (value / totalValue) * 100 : 0,
+    };
+  });
+}
+
+/** Proventos recebidos desde `since` (inclusive), em R$. */
+export function sumIncomesSince(incomes: readonly InvestmentIncome[], since: string): number {
+  return sumMoney(incomes.filter((income) => income.date >= since).map((income) => income.amount));
 }

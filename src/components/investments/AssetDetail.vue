@@ -9,8 +9,8 @@ import {
   INCOME_TYPE_LABELS,
   OPERATION_TYPE_LABELS,
 } from "@/types/investments";
-import { formatCurrency, formatPercent, formatQuantity } from "@/utils/currency";
-import { formatDateBR } from "@/utils/date";
+import { formatCurrency, formatQuantity, formatSignedPercent } from "@/utils/currency";
+import { formatDateBR, formatRelativeTime } from "@/utils/date";
 
 const props = defineProps<{ assetId: number }>();
 const emit = defineEmits<{ back: []; edit: []; deleted: [] }>();
@@ -135,6 +135,9 @@ const handleRemoveIncome = (id?: number) => id !== undefined && run(() => remove
         <span v-if="view.position.quantity > 0 && !view.hasManualPrice" class="metric__hint">
           sem cotação informada
         </span>
+        <span v-else-if="view.position.quantity > 0 && view.asset.priceUpdatedAt" class="metric__hint">
+          cotação {{ formatRelativeTime(view.asset.priceUpdatedAt) }}
+        </span>
       </article>
       <article class="metric">
         <span class="metric__label">Lucro/prejuízo</span>
@@ -143,10 +146,18 @@ const handleRemoveIncome = (id?: number) => id !== undefined && run(() => remove
         </strong>
       </article>
       <article class="metric">
-        <span class="metric__label">Rentabilidade</span>
-        <strong class="metric__value" :class="view.profitPercent >= 0 ? 'text-income' : 'text-expense'">
-          {{ formatPercent(view.profitPercent) }}
+        <span class="metric__label">Variação</span>
+        <strong class="metric__value" :class="view.variationPercent >= 0 ? 'text-income' : 'text-expense'">
+          {{ formatSignedPercent(view.variationPercent) }}
         </strong>
+        <span class="metric__hint">preço atual x preço médio</span>
+      </article>
+      <article class="metric">
+        <span class="metric__label">Rentabilidade</span>
+        <strong class="metric__value" :class="view.returnPercent >= 0 ? 'text-income' : 'text-expense'">
+          {{ formatSignedPercent(view.returnPercent) }}
+        </strong>
+        <span class="metric__hint">com proventos e vendas</span>
       </article>
       <article class="metric">
         <span class="metric__label">Rendimentos recebidos</span>

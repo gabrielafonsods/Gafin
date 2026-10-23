@@ -111,3 +111,14 @@ export function formatMonthShort(key: string): string {
     .toLocaleDateString("pt-BR", { month: "short" })
     .replace(".", "");
 }
+
+/** "agora", "há 12 min", "há 3 h", "há 2 dias" — para mostrar a idade de uma cotação. */
+export function formatRelativeTime(iso: string, now: Date = new Date()): string {
+  const minutes = Math.max(0, Math.round((now.getTime() - new Date(iso).getTime()) / 60_000));
+  if (minutes < 1) return "agora";
+  if (minutes < 60) return `há ${minutes} min`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `há ${hours} h`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? "há 1 dia" : `há ${days} dias`;
+}
